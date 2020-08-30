@@ -1,40 +1,73 @@
-var scene;
-var camera;
-var renderer;
+import * as THREE from './lib/three/three.module.js'
 
+const fov = 75;
+const aspect = 2;  // the canvas default
+const near = 0.1;
+const far = 5;
+
+const boxWidth = 1;
+const boxHeight = 1;
+const boxDepth = 1;
+
+var canvas;
+var renderer;
+var camera;
+var scene;
 var cube;
 
 function init() {
-    scene = new THREE.Scene();
-    camera = new THREE.PerspectiveCamera( 75, window.innerWidth / window.innerHeight, 0.1, 1000 );
-    
-    renderer = new THREE.WebGLRenderer();
-    renderer.setSize( window.innerWidth, window.innerHeight );
-    document.body.appendChild( renderer.domElement );
+    canvas = document.querySelector('#canvas');
+    renderer = new THREE.WebGLRenderer({canvas});
+    camera = new THREE.PerspectiveCamera(fov, aspect, near, far);
 }
 
 function createScene() {
-
-    var geometry = new THREE.BoxGeometry();
-    var material = new THREE.MeshBasicMaterial( { color: 0x00ff00 } );
-    cube = new THREE.Mesh( geometry, material );
-    scene.add( cube );
-    
-    camera.position.z = 5;
+    scene = new THREE.Scene();
+    camera.position.z = 2;
+    createCube();
 }
 
-function animate() {
-    requestAnimationFrame( animate );
+function createCube() {
+    const geometry = new THREE.BoxGeometry(boxWidth, boxHeight, boxDepth);
 
-    cube.rotation.x += 0.01;
-    cube.rotation.y += 0.01;
+    const material = new THREE.MeshBasicMaterial({color: 0x44aa88});  // greenish blue
+  
+    cube = new THREE.Mesh(geometry, material);
+    scene.add(cube);
+}
 
-    renderer.render( scene, camera );
-};
+function resizeRendererToDisplaySize(renderer) {
+    const canvas = renderer.domElement;
+    const pixelRatio = window.devicePixelRatio;
+    const width  = canvas.clientWidth  * pixelRatio | 0;
+    const height = canvas.clientHeight * pixelRatio | 0;
+    const needResize = canvas.width !== width || canvas.height !== height;
+    if (needResize) {
+      renderer.setSize(width, height, false);
+    }
+    return needResize;
+  }
+
+function render(time) {
+    time *= 0.001;  // convert time to seconds
+    
+    if (resizeRendererToDisplaySize(renderer)) {
+        const canvas = renderer.domElement;
+        camera.aspect = canvas.clientWidth / canvas.clientHeight;
+        camera.updateProjectionMatrix();
+    }
+    
+    cube.rotation.x = time;
+    cube.rotation.y = time;
+
+    renderer.render(scene, camera);
+
+    requestAnimationFrame(render);
+  }
 
 function main() {
     init();
     createScene();
-    animate();
+    requestAnimationFrame(render);
 }
 main();
