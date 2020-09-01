@@ -1,40 +1,106 @@
-import * as THREE from './lib/three/three.module.js'
+import * as THREE from './lib/three.js/build/three.module.js'
+import {GLTFLoader} from './lib/three.js/examples/jsm/loaders/GLTFLoader.js'
+import { OrbitControls } from './lib/three.js/examples/jsm/controls/OrbitControls.js';
 
-const fov = 75;
-const aspect = 2;  // the canvas default
-const near = 0.1;
-const far = 5;
-
-const boxWidth = 1;
-const boxHeight = 1;
-const boxDepth = 1;
+// ============================================================================
+// GLOBAL VARIABLES AND PARAMETERS
+// ============================================================================
 
 var canvas;
 var renderer;
+var textureLoader;
+
+// Objects variables
 var camera;
 var scene;
-var cube;
+var light;
+
+// Camera parameters
+const fov = 75;
+const aspect = window.innerWidth / window.innerHeight;  // the canvas default
+const near = 0.1;
+const far = 100000;
+
+const distance = 100;
+
+
+// ============================================================================
+// INITIALIZATION FUNCTIONS
+// ============================================================================
 
 function init() {
-    canvas = document.querySelector('#canvas');
-    renderer = new THREE.WebGLRenderer({canvas});
-    camera = new THREE.PerspectiveCamera(fov, aspect, near, far);
+    renderer = new THREE.WebGLRenderer();
+    renderer.setPixelRatio( window.devicePixelRatio );
+    renderer.setSize( window.innerWidth, window.innerHeight );
+    document.body.appendChild( renderer.domElement );
+
+    renderer.shadowMap.enabled = true;
+
+    window.addEventListener( 'resize', onWindowResize, false );
+
+    textureLoader = new THREE.TextureLoader();
 }
+
+// ============================================================================
+// MODEL LOADING FUNCTIONS
+// ============================================================================
+
+
+// ============================================================================
+// SCENE BUILDING FUNCTIONS
+// ============================================================================
 
 function createScene() {
     scene = new THREE.Scene();
-    camera.position.z = 2;
-    createCube();
+    scene.background = new THREE.Color( 0xcce0ff );
+    scene.fog = new THREE.Fog( 0xcce0ff, 500, 10000 );
+    createCamera();
+    createLight();
+    createGround();
 }
 
-function createCube() {
-    const geometry = new THREE.BoxGeometry(boxWidth, boxHeight, boxDepth);
-
-    const material = new THREE.MeshBasicMaterial({color: 0x44aa88});  // greenish blue
-  
-    cube = new THREE.Mesh(geometry, material);
-    scene.add(cube);
+function createCamera() {
+    camera = new THREE.PerspectiveCamera(fov, aspect, near, far);
+    camera.position.set( 0, 0, 1 );
+    camera.position.multiplyScalar( distance );
+    camera.lookAt( scene.position );
 }
+
+
+function createLight() {
+    light = new THREE.DirectionalLight( 0xdfebff, 1 );
+    light.position.set( 0, 1, 0 );
+    light.position.multiplyScalar( 100 );
+
+    scene.add( light );
+}
+
+function createGround() {
+    var groundTexture = textureLoader.load( './assets/grass_texture.jpg' );
+    groundTexture.wrapS = groundTexture.wrapT = THREE.RepeatWrapping;
+    groundTexture.repeat.set( 25, 25 );
+    groundTexture.anisotropy = 16;
+    groundTexture.encoding = THREE.sRGBEncoding;
+
+    var groundMaterial = new THREE.MeshLambertMaterial( { map: groundTexture } );
+
+    var mesh = new THREE.Mesh( new THREE.PlaneBufferGeometry( 20000, 20000 ), groundMaterial );
+    mesh.position.y = - 250;
+    mesh.rotation.x = - Math.PI / 2;
+    mesh.receiveShadow = true;
+    scene.add( mesh );
+}
+
+function handleControls() {
+    var controls = new OrbitControls( camera, renderer.domElement );
+    controls.maxPolarAngle = Math.PI * 0.5;
+    controls.minDistance = 1000;
+    controls.maxDistance = 5000;
+}
+
+// ============================================================================
+// RENDERING FUNCTIONS
+// ============================================================================
 
 function resizeRendererToDisplaySize(renderer) {
     const canvas = renderer.domElement;
@@ -43,31 +109,30 @@ function resizeRendererToDisplaySize(renderer) {
     const height = canvas.clientHeight * pixelRatio | 0;
     const needResize = canvas.width !== width || canvas.height !== height;
     if (needResize) {
-      renderer.setSize(width, height, false);
+        renderer.setSize(width, height, false);
     }
     return needResize;
-  }
+}
+
+function onWindowResize() {
+    if (resizeRendererToDisplaySize(renderer)) {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize( window.innerWidth, window.innerHeight );
+    }
+}
 
 function render(time) {
     time *= 0.001;  // convert time to seconds
     
-    if (resizeRendererToDisplaySize(renderer)) {
-        const canvas = renderer.domElement;
-        camera.aspect = canvas.clientWidth / canvas.clientHeight;
-        camera.updateProjectionMatrix();
-    }
-    
-    cube.rotation.x = time;
-    cube.rotation.y = time;
-
     renderer.render(scene, camera);
-
     requestAnimationFrame(render);
-  }
+}
 
 function main() {
     init();
     createScene();
+    handleControls();
     requestAnimationFrame(render);
 }
 main();
