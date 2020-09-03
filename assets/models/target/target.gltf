@@ -1,0 +1,138 @@
+{
+    "asset" : {
+        "generator" : "Khronos glTF Blender I/O v1.1.46",
+        "version" : "2.0"
+    },
+    "scene" : 0,
+    "scenes" : [
+        {
+            "name" : "Scene",
+            "nodes" : [
+                0
+            ]
+        }
+    ],
+    "nodes" : [
+        {
+            "mesh" : 0,
+            "name" : "Target",
+            "rotation" : [
+                0.7071068286895752,
+                0,
+                0,
+                0.7071067094802856
+            ]
+        }
+    ],
+    "materials" : [
+        {
+            "doubleSided" : true,
+            "emissiveFactor" : [
+                0,
+                0,
+                0
+            ],
+            "name" : "Target",
+            "pbrMetallicRoughness" : {
+                "baseColorTexture" : {
+                    "index" : 0,
+                    "texCoord" : 0
+                },
+                "metallicFactor" : 0,
+                "roughnessFactor" : 0.5
+            }
+        }
+    ],
+    "meshes" : [
+        {
+            "name" : "Mesh",
+            "primitives" : [
+                {
+                    "attributes" : {
+                        "POSITION" : 0,
+                        "NORMAL" : 1,
+                        "TEXCOORD_0" : 2
+                    },
+                    "indices" : 3,
+                    "material" : 0
+                }
+            ]
+        }
+    ],
+    "textures" : [
+        {
+            "source" : 0
+        }
+    ],
+    "images" : [
+        {
+            "mimeType" : "image/jpeg",
+            "name" : "ArcheryTarget_BaseColor_compressed",
+            "uri" : "ArcheryTarget_BaseColor_compressed.jpg"
+        }
+    ],
+    "accessors" : [
+        {
+            "bufferView" : 0,
+            "componentType" : 5126,
+            "count" : 1266,
+            "max" : [
+                1.1865190267562866,
+                0.8640120029449463,
+                0.08605899661779404
+            ],
+            "min" : [
+                -1.186519980430603,
+                -1.145637035369873,
+                -2.323148012161255
+            ],
+            "type" : "VEC3"
+        },
+        {
+            "bufferView" : 1,
+            "componentType" : 5126,
+            "count" : 1266,
+            "type" : "VEC3"
+        },
+        {
+            "bufferView" : 2,
+            "componentType" : 5126,
+            "count" : 1266,
+            "type" : "VEC2"
+        },
+        {
+            "bufferView" : 3,
+            "componentType" : 5123,
+            "count" : 2664,
+            "type" : "SCALAR"
+        }
+    ],
+    "bufferViews" : [
+        {
+            "buffer" : 0,
+            "byteLength" : 15192,
+            "byteOffset" : 0
+        },
+        {
+            "buffer" : 0,
+            "byteLength" : 15192,
+            "byteOffset" : 15192
+        },
+        {
+            "buffer" : 0,
+            "byteLength" : 10128,
+            "byteOffset" : 30384
+        },
+        {
+            "buffer" : 0,
+            "byteLength" : 5328,
+            "byteOffset" : 40512
+        }
+    ],
+    "buffers" : [
+        {
+            "byteLength" : 45840,
+            "uri" : "target.bin"
+        }
+    ]
+}

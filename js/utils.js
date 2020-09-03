@@ -15,8 +15,14 @@ export function dumpObject(obj, lines = [], isLast = true, prefix = '') {
 	return lines;
 }
 
-export function degtorad(degrees)
-{
-  var pi = Math.PI;
-  return degrees * (pi/180);
+export function degToRad(degrees) {
+    return (Math.PI / 180.0) * degrees;
+}
+
+export function degToRad3(degrees3) {
+    var rad = [];
+    for (var i = 0; i < 3; i++) {
+        rad.push(degToRad(degrees3[i]));
+    }
+    return rad;
 }

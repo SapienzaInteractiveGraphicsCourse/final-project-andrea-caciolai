@@ -2,7 +2,7 @@ import * as THREE from '../lib/three.js/build/three.module.js'
 import {GLTFLoader} from '../lib/three.js/examples/jsm/loaders/GLTFLoader.js'
 import { OrbitControls } from '../lib/three.js/examples/jsm/controls/OrbitControls.js';
 import {SkeletonUtils} from '../lib/three.js/examples/jsm/utils/SkeletonUtils.js';
-import {dumpObject} from './utils.js'
+import {dumpObject, degToRad, degToRad3} from './utils.js'
 
 // ============================================================================
 // GLOBAL VARIABLES AND PARAMETERS
@@ -17,6 +17,7 @@ var controls;
 var camera;
 var scene;
 var light;
+var ambientLight;
 var models;
 
 // Camera parameters
@@ -25,14 +26,34 @@ const aspect = window.innerWidth / window.innerHeight;  // the canvas default
 const near = 0.1;
 const far = 100000;
 
+const cameraPosition = [ -0.5, 0.5, 0.5 ];
 const cameraDistance = 100;
+
+// Light parameters
 const lightDistance = 200;
+const lightPosition = [ 0, 0.25, 1 ];
+const lightTarget = [ 0, 0, 0 ];
+const lightColor = 0xFFFFFFFF;
+const lightIntensity = 5;
 
 // Model variables
 var modelsLoaded = false;
 
 models = {
-    link:    { url: '../assets/models/link/link.gltf' },
+    link:    { 
+        url: '../assets/models/link/link.gltf',
+        pos: [ 0, 0, 0 ],
+        rotation: [ 0, 90, 0, ],
+        scale: 10,
+        buildCallback: buildLink,
+    },
+    target:  { 
+        url: '../assets/models/target/target.gltf',
+        pos: [ 100, 0, 0 ],
+        rotation: [ 0, -90, 0, ],
+        scale: 10,
+        buildCallback: buildTarget,
+    },
 };
 
 // ============================================================================
@@ -58,6 +79,7 @@ function init() {
 // ============================================================================
 // MODEL(s) CODE (Loading, building, displaying)
 // ============================================================================
+
 function loadModels(callback) {    
     loadingManager.onLoad = function() {
         console.log('Loading complete!');
@@ -75,24 +97,53 @@ function loadModels(callback) {
     const gltfLoader = new GLTFLoader(loadingManager);
     for (const model of Object.values(models)) {
         gltfLoader.load(model.url, (gltf) => {
+            gltf.scene.traverse( function ( child ) {
+                if ( child.isMesh || child.isSkinnedMesh ) {
+                    if ( child.castShadow !== undefined ) {
+                        child.castShadow = true;
+                        child.receiveShadow = true;
+                    }
+                }
+            } );
             model.gltf = gltf;
+            console.log(dumpObject(model.gltf.scene));
         });
     }
 }
 
-function displayModels() {
+function buildModels() {
     const loadingElem = document.querySelector('#loading');
     loadingElem.style.display = 'none';
 
-    Object.values(models).forEach((model, ndx) => {
-        const clonedScene = SkeletonUtils.clone(model.gltf.scene);
+    for (const model of Object.values(models)) {
         const root = new THREE.Object3D();
-        root.add(clonedScene);
-        scene.add(root);
-        root.position.set(0, 0, 0);
-        root.scale.multiplyScalar(10);
-        console.log(dumpObject(model.gltf.scene));
-    });
+        
+        root.position.set(...model.pos);
+        root.scale.multiplyScalar(model.scale);
+        
+        var rotation = degToRad3(model.rotation);
+        root.rotation.set(...rotation);
+        
+        model.root = root;
+        
+        if ( typeof model.buildCallback !== 'undefined' ) {
+            model.buildCallback();
+        }
+        
+        scene.add( model.root );
+    }
+}
+
+function buildLink() {
+    const link = models.link;
+    const clonedScene = SkeletonUtils.clone(link.gltf.scene);
+    link.root.add(clonedScene);
+}
+
+function buildTarget() {
+    const target = models.target;
+    const scene = target.gltf.scene;
+    target.root.add(scene);
 }
 
 // ============================================================================
@@ -107,24 +158,38 @@ function buildScene() {
     createCamera();
     createLight();
     createGround();  
-    displayModels();
+    buildModels();
 }
 
 function createCamera() {
     camera = new THREE.PerspectiveCamera(fov, aspect, near, far);
-    camera.position.set( 0, .2, 1 );
-    camera.position.multiplyScalar( cameraDistance );
+    camera.position.set( ...cameraPosition );
+    camera.position.multiplyScalar( cameraDistance )
     camera.lookAt( scene.position );
 }
 
+function createDirectionalLight() {
+    light = new THREE.DirectionalLight( lightColor, lightIntensity );
+    light.position.set( ...lightPosition );
+    light.position.multiplyScalar( lightDistance );
+    light.target.position.set( ...lightTarget );
+
+    light.castShadow = true;
+    scene.add( light );
+}
+
+function createAmbientLight() {
+    const color = 0xFFFFFF;
+    const intensity = 1;
+    ambientLight = new THREE.AmbientLight(color, intensity);
+    ambientLight.castShadow = true;
+
+    scene.add( ambientLight );
+}
 
 function createLight() {
-    light = new THREE.DirectionalLight( 'rgb(255, 255, 255)', 5 );
-    light.position.set( 0, 1, 1 );
-    light.position.multiplyScalar( lightDistance );
-    light.target.position.set( 0, 0, 0 );
-
-    scene.add( light );
+    createDirectionalLight();
+    // createAmbientLight();
 }
 
 function createGround() {
