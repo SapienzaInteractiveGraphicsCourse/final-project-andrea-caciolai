@@ -55,25 +55,24 @@ var modelsLoaded = false;
 models = {
     link:    { 
         url: '../assets/models/link/link.gltf',
-        name: 'Link',
-        pos: [ 0, 0, 0 ],
+        position: [ 0, 0, 0 ],
         rotation: [ 0, 0, 0, ],
         scale: 10,
         buildCallback: buildLink,
     },
     target:  { 
         url: '../assets/models/target/target.gltf',
-        name: 'Target',
-        pos: [ 0, 0, 100 ],
+        position: [ 0, 0, 100 ],
         rotation: [ 0, 180, 0, ],
         scale: 10,
+        buildCallback: buildTarget,
     },
     bow: {
         url: '../assets/models/bow/bow.gltf',
         name: 'Bow',
-        rotation: [90, -180, 0],
-        offset: [1, 0.5, 0.5],
-        scale: 0.5,
+        position: [-0.05, 0.15, 0.05],
+        rotation: [-180, 90, 90],
+        scale: 0.05,
         buildCallback: buildBow,
     }
 };
@@ -140,26 +139,7 @@ function buildModels() {
 
     for (const model of Object.values(models)) {
         // const root = new THREE.Object3D();
-        
-        model.root = model.gltf.scene.children[0];
-        if (model.pos) {
-            model.root.position.set(...model.pos);
-        }
-        if (model.scale) {
-            model.root.scale.multiplyScalar(model.scale);
-        }
-        if (model.rotation) {
-            const rotation = degToRad3(model.rotation);
-            model.root.rotation.set(...rotation);
-        }
-        // model.root.name = model.name;
-        
-        if ( model.buildCallback ) {
-            model.buildCallback();
-        }
-        
-        scene.add( model.root );
-        console.log(dumpObject(model.root));
+        model.buildCallback();
     }
 
     camera.updateProjectionMatrix();
@@ -169,6 +149,14 @@ function buildLink() {
     const link = models.link;
     const clonedScene = SkeletonUtils.clone(link.gltf.scene);
     link.root = clonedScene.children[0];
+    
+    link.root.position.set(...link.position);
+    link.root.scale.multiplyScalar(link.scale);
+    const rotation = degToRad3(link.rotation);
+    link.root.rotation.set(...rotation);
+        
+    scene.add( link.root );
+    console.log(dumpObject(link.root));
 }
 
 function buildBow() {
@@ -178,16 +166,32 @@ function buildBow() {
     scene.updateMatrixWorld();
 
     var linkHand = models.link.root.getObjectByName('handL');
-    var pos = linkHand.getWorldPosition();
-    
-    const offset = bow.offset;
-    const pos_x = pos.x + offset[0];
-    const pos_y = pos.y + offset[1];
-    const pos_z = pos.z + offset[2];
 
     bow.root = clonedScene.children[0];
-    bow.root.position.set(pos_x, pos_y, pos_z);
     bow.root.add(clonedScene);
+
+    bow.root.position.x += bow.position[0];
+    bow.root.position.y += bow.position[1];
+    bow.root.position.z += bow.position[2];
+    const rotation = degToRad3(bow.rotation);
+    bow.root.rotation.set(...rotation);
+    bow.root.scale.multiplyScalar(bow.scale);
+    
+    linkHand.add(bow.root);
+    console.log(dumpObject(bow.root));
+}
+
+function buildTarget() {
+    const target = models.target;
+    target.root = target.gltf.scene.children[0];
+    
+    target.root.position.set(...target.position);
+    target.root.scale.multiplyScalar(target.scale);
+    const rotation = degToRad3(target.rotation);
+    target.root.rotation.set(...rotation);
+
+    scene.add( target.root );
+    console.log(dumpObject(target.root));
 }
 
 // ============================================================================
