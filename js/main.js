@@ -17,7 +17,7 @@ var controls;
 var camera;
 var scene;
 var light;
-var ambientLight;
+var ambient;
 var models;
 
 // Camera parameters
@@ -26,15 +26,22 @@ const aspect = window.innerWidth / window.innerHeight;  // the canvas default
 const near = 0.1;
 const far = 100000;
 
-const cameraPosition = [ -0.5, 0.5, 0.5 ];
+const cameraPosition = [ 1, 1, 0.0 ];
 const cameraDistance = 100;
 
 // Light parameters
 const lightDistance = 200;
-const lightPosition = [ 0, 0.25, 1 ];
+const lightPosition = [ 0, 1, 2 ];
 const lightTarget = [ 0, 0, 0 ];
 const lightColor = 0xFFFFFFFF;
 const lightIntensity = 5;
+
+const SHADOW_MAP_WIDTH = 2048; 
+const SHADOW_MAP_HEIGHT = 2048;
+
+const shadowCameraWidth = 100;
+const shadowCameraHeight = 100;
+const shadowCameraDepth = 1000;
 
 // Model variables
 var modelsLoaded = false;
@@ -43,17 +50,23 @@ models = {
     link:    { 
         url: '../assets/models/link/link.gltf',
         pos: [ 0, 0, 0 ],
-        rotation: [ 0, 90, 0, ],
+        rotation: [ 0, 0, 0, ],
         scale: 10,
         buildCallback: buildLink,
     },
     target:  { 
         url: '../assets/models/target/target.gltf',
-        pos: [ 100, 0, 0 ],
-        rotation: [ 0, -90, 0, ],
+        pos: [ 0, 0, 100 ],
+        rotation: [ 0, 180, 0, ],
         scale: 10,
-        buildCallback: buildTarget,
     },
+    bow: {
+        url: '../assets/models/bow/bow.gltf',
+        rotation: [0, -180, 0],
+        offset: [1, 0, 0.5],
+        scale: 0.5,
+        buildCallback: buildBow,
+    }
 };
 
 // ============================================================================
@@ -80,7 +93,7 @@ function init() {
 // MODEL(s) CODE (Loading, building, displaying)
 // ============================================================================
 
-function loadModels(callback) {    
+function loadModels(callback) {   
     loadingManager.onLoad = function() {
         console.log('Loading complete!');
         // hide the loading bar
@@ -98,11 +111,13 @@ function loadModels(callback) {
     for (const model of Object.values(models)) {
         gltfLoader.load(model.url, (gltf) => {
             gltf.scene.traverse( function ( child ) {
-                if ( child.isMesh || child.isSkinnedMesh ) {
-                    if ( child.castShadow !== undefined ) {
-                        child.castShadow = true;
-                        child.receiveShadow = true;
-                    }
+                if ( child.isMesh ) {
+                    child.castShadow = true;
+                    child.receiveShadow = true;
+                    // if ( child.material ) {
+                    //     child.material.metalness = 0;
+                    //     child.material.shininess = 0;
+                    // }
                 }
             } );
             model.gltf = gltf;
@@ -118,20 +133,30 @@ function buildModels() {
     for (const model of Object.values(models)) {
         const root = new THREE.Object3D();
         
-        root.position.set(...model.pos);
-        root.scale.multiplyScalar(model.scale);
-        
-        var rotation = degToRad3(model.rotation);
-        root.rotation.set(...rotation);
+        if (model.pos) {
+            root.position.set(...model.pos);
+        }
+        if (model.scale) {
+            root.scale.multiplyScalar(model.scale);
+        }
+        if (model.rotation) {
+            const rotation = degToRad3(model.rotation);
+            root.rotation.set(...rotation);
+        }
         
         model.root = root;
         
-        if ( typeof model.buildCallback !== 'undefined' ) {
+        if ( model.buildCallback ) {
             model.buildCallback();
+        } else {
+            const modelScene = model.gltf.scene;
+            model.root.add( modelScene );
         }
         
         scene.add( model.root );
     }
+
+    camera.updateProjectionMatrix();
 }
 
 function buildLink() {
@@ -140,10 +165,23 @@ function buildLink() {
     link.root.add(clonedScene);
 }
 
-function buildTarget() {
-    const target = models.target;
-    const scene = target.gltf.scene;
-    target.root.add(scene);
+function buildBow() {
+    const bow = models.bow;
+    const clonedScene = SkeletonUtils.clone(bow.gltf.scene);
+
+    scene.updateMatrixWorld();
+
+    var linkHand = models.link.gltf.scene.getObjectByName('handL');
+    var pos = linkHand.getWorldPosition();
+    pos.multiplyScalar(models.link.scale);
+    
+    const offset = bow.offset;
+    const pos_x = pos.x + offset[0];
+    const pos_y = pos.y + offset[1];
+    const pos_z = pos.z + offset[2];
+
+    bow.root.position.set(pos_x, pos_y, pos_z);
+    bow.root.add(clonedScene);
 }
 
 // ============================================================================
@@ -175,21 +213,31 @@ function createDirectionalLight() {
     light.target.position.set( ...lightTarget );
 
     light.castShadow = true;
+
+    light.shadow.camera.left = - shadowCameraWidth;
+    light.shadow.camera.right = shadowCameraWidth;
+    light.shadow.camera.top = shadowCameraHeight;
+    light.shadow.camera.bottom = - shadowCameraHeight;
+    light.shadow.camera.near = 0.1;
+    light.shadow.camera.far = shadowCameraDepth;
+
+    light.shadow.mapSize.width = SHADOW_MAP_WIDTH;
+    light.shadow.mapSize.height = SHADOW_MAP_HEIGHT;
+
     scene.add( light );
 }
 
 function createAmbientLight() {
     const color = 0xFFFFFF;
     const intensity = 1;
-    ambientLight = new THREE.AmbientLight(color, intensity);
-    ambientLight.castShadow = true;
-
-    scene.add( ambientLight );
+    ambient = new THREE.AmbientLight(color, intensity);
+    
+    scene.add( ambient );
 }
 
 function createLight() {
     createDirectionalLight();
-    // createAmbientLight();
+    createAmbientLight();
 }
 
 function createGround() {
