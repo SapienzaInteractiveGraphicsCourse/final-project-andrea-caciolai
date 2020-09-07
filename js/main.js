@@ -1,6 +1,9 @@
 import * as THREE from '../lib/three.js/build/three.module.js'
 import {GLTFLoader} from '../lib/three.js/examples/jsm/loaders/GLTFLoader.js'
 import { OrbitControls } from '../lib/three.js/examples/jsm/controls/OrbitControls.js';
+import { PointerLockControls } from '../lib/three.js/examples/jsm/controls/PointerLockControls.js';
+import TWEEN from '../lib/tween.js/dist/tween.esm.js'
+
 import {SkeletonUtils} from '../lib/three.js/examples/jsm/utils/SkeletonUtils.js';
 import {dumpObject, degToRad, degToRad3} from './utils.js'
 
@@ -28,6 +31,9 @@ const far = 100000;
 
 const cameraPosition = [ 1, 1, 0.0 ];
 const cameraDistance = 100;
+const fogNear = 50;
+const fogFar = 1000;
+const fogColor = 0xcce0ff;
 
 // Light parameters
 const lightDistance = 200;
@@ -49,6 +55,7 @@ var modelsLoaded = false;
 models = {
     link:    { 
         url: '../assets/models/link/link.gltf',
+        name: 'Link',
         pos: [ 0, 0, 0 ],
         rotation: [ 0, 0, 0, ],
         scale: 10,
@@ -56,14 +63,16 @@ models = {
     },
     target:  { 
         url: '../assets/models/target/target.gltf',
+        name: 'Target',
         pos: [ 0, 0, 100 ],
         rotation: [ 0, 180, 0, ],
         scale: 10,
     },
     bow: {
         url: '../assets/models/bow/bow.gltf',
-        rotation: [0, -180, 0],
-        offset: [1, 0, 0.5],
+        name: 'Bow',
+        rotation: [90, -180, 0],
+        offset: [1, 0.5, 0.5],
         scale: 0.5,
         buildCallback: buildBow,
     }
@@ -114,14 +123,13 @@ function loadModels(callback) {
                 if ( child.isMesh ) {
                     child.castShadow = true;
                     child.receiveShadow = true;
-                    // if ( child.material ) {
-                    //     child.material.metalness = 0;
-                    //     child.material.shininess = 0;
-                    // }
+                    if ( child.material ) {
+                        child.material.metalness = 0;
+                        child.material.shininess = 0;
+                    }
                 }
             } );
             model.gltf = gltf;
-            console.log(dumpObject(model.gltf.scene));
         });
     }
 }
@@ -131,29 +139,27 @@ function buildModels() {
     loadingElem.style.display = 'none';
 
     for (const model of Object.values(models)) {
-        const root = new THREE.Object3D();
+        // const root = new THREE.Object3D();
         
+        model.root = model.gltf.scene.children[0];
         if (model.pos) {
-            root.position.set(...model.pos);
+            model.root.position.set(...model.pos);
         }
         if (model.scale) {
-            root.scale.multiplyScalar(model.scale);
+            model.root.scale.multiplyScalar(model.scale);
         }
         if (model.rotation) {
             const rotation = degToRad3(model.rotation);
-            root.rotation.set(...rotation);
+            model.root.rotation.set(...rotation);
         }
-        
-        model.root = root;
+        // model.root.name = model.name;
         
         if ( model.buildCallback ) {
             model.buildCallback();
-        } else {
-            const modelScene = model.gltf.scene;
-            model.root.add( modelScene );
         }
         
         scene.add( model.root );
+        console.log(dumpObject(model.root));
     }
 
     camera.updateProjectionMatrix();
@@ -162,7 +168,7 @@ function buildModels() {
 function buildLink() {
     const link = models.link;
     const clonedScene = SkeletonUtils.clone(link.gltf.scene);
-    link.root.add(clonedScene);
+    link.root = clonedScene.children[0];
 }
 
 function buildBow() {
@@ -171,15 +177,15 @@ function buildBow() {
 
     scene.updateMatrixWorld();
 
-    var linkHand = models.link.gltf.scene.getObjectByName('handL');
+    var linkHand = models.link.root.getObjectByName('handL');
     var pos = linkHand.getWorldPosition();
-    pos.multiplyScalar(models.link.scale);
     
     const offset = bow.offset;
     const pos_x = pos.x + offset[0];
     const pos_y = pos.y + offset[1];
     const pos_z = pos.z + offset[2];
 
+    bow.root = clonedScene.children[0];
     bow.root.position.set(pos_x, pos_y, pos_z);
     bow.root.add(clonedScene);
 }
@@ -190,13 +196,18 @@ function buildBow() {
 
 function buildScene() {
     scene = new THREE.Scene();
-    const color = 0xcce0ff;
-    scene.background = new THREE.Color( color );
-    scene.fog = new THREE.Fog( color, 500, 10000 );
+    scene.background = new THREE.Color( fogColor );
+
     createCamera();
     createLight();
+    createFog();
+
     createGround();  
     buildModels();
+}
+
+function createFog() {
+    scene.fog = new THREE.Fog( fogColor, fogNear, fogFar );
 }
 
 function createCamera() {
@@ -269,6 +280,8 @@ function handleControls() {
     controls.maxPolarAngle = Math.PI * 0.5 - 0.1;
     controls.target.set(0, 0, 0);
     controls.update();
+
+    
 }
 
 // ============================================================================
@@ -285,8 +298,8 @@ function onWindowResize() {
 function render(time) {
     time *= 0.001;  // convert time to seconds
     
-    controls.update();
-
+    TWEEN.update();
+    
     renderer.render(scene, camera);
     requestAnimationFrame(render);
 }
@@ -298,6 +311,7 @@ function main() {
         init();
         buildScene();
         handleControls();
+
         requestAnimationFrame(render);
     }
 }
