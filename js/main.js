@@ -53,8 +53,15 @@ const shadowCameraDepth = 1000;
 var modelsLoaded = false;
 
 models = {
+    // link:    { 
+    //     url: '../assets/models/link/link.gltf',
+    //     position: [ 0, 0, 0 ],
+    //     rotation: [ 0, 0, 0, ],
+    //     scale: 10,
+    //     buildCallback: buildLink,
+    // },
     link:    { 
-        url: '../assets/models/link/link.gltf',
+        url: '../assets/models/link_with_bow/link_with_bow.gltf',
         position: [ 0, 0, 0 ],
         rotation: [ 0, 0, 0, ],
         scale: 10,
@@ -67,14 +74,14 @@ models = {
         scale: 10,
         buildCallback: buildTarget,
     },
-    bow: {
-        url: '../assets/models/bow/bow.gltf',
-        name: 'Bow',
-        position: [-0.05, 0.15, 0.05],
-        rotation: [-180, 90, 90],
-        scale: 0.05,
-        buildCallback: buildBow,
-    }
+    // bow: {
+    //     url: '../assets/models/bow/bow.gltf',
+    //     name: 'Bow',
+    //     position: [-0.05, 0.15, 0.05],
+    //     rotation: [-180, 90, 90],
+    //     scale: 0.05,
+    //     buildCallback: buildBow,
+    // }
 };
 
 // ============================================================================
@@ -144,6 +151,20 @@ function buildModels() {
 
     camera.updateProjectionMatrix();
 }
+
+// function buildLink() {
+//     const link = models.link;
+//     const clonedScene = SkeletonUtils.clone(link.gltf.scene);
+//     link.root = clonedScene.children[0];
+    
+//     link.root.position.set(...link.position);
+//     link.root.scale.multiplyScalar(link.scale);
+//     const rotation = degToRad3(link.rotation);
+//     link.root.rotation.set(...rotation);
+        
+//     scene.add( link.root );
+//     console.log(dumpObject(link.root));
+// }
 
 function buildLink() {
     const link = models.link;
