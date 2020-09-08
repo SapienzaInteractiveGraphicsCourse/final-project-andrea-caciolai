@@ -29,8 +29,11 @@ const aspect = window.innerWidth / window.innerHeight;  // the canvas default
 const near = 0.1;
 const far = 100000;
 
-const cameraPosition = [ 1, 1, 0.0 ];
-const cameraDistance = 100;
+// const cameraPosition = [ 1, 1, 0.0 ];
+// const cameraDistance = 100;
+
+var cameraPosition = [ 0, 3, -5 ];
+
 const fogNear = 50;
 const fogFar = 1000;
 const fogColor = 0xcce0ff;
@@ -83,6 +86,17 @@ models = {
     //     buildCallback: buildBow,
     // }
 };
+
+// Controls parameters
+var moveForward = false;
+var moveBackward = false;
+var moveLeft = false;
+var moveRight = false;
+var canJump = false;
+
+var prevTime = performance.now();
+var velocity = new THREE.Vector3();
+var direction = new THREE.Vector3();
 
 // ============================================================================
 // INITIALIZATION FUNCTIONS
@@ -148,8 +162,6 @@ function buildModels() {
         // const root = new THREE.Object3D();
         model.buildCallback();
     }
-
-    camera.updateProjectionMatrix();
 }
 
 // function buildLink() {
@@ -175,32 +187,44 @@ function buildLink() {
     link.root.scale.multiplyScalar(link.scale);
     const rotation = degToRad3(link.rotation);
     link.root.rotation.set(...rotation);
-        
+    
+    buildBow();
+
     scene.add( link.root );
     console.log(dumpObject(link.root));
 }
 
 function buildBow() {
-    const bow = models.bow;
-    const clonedScene = SkeletonUtils.clone(bow.gltf.scene);
-
     scene.updateMatrixWorld();
 
     var linkHand = models.link.root.getObjectByName('handL');
+    var bow = models.link.root.getObjectByName('Bow');
 
-    bow.root = clonedScene.children[0];
-    bow.root.add(clonedScene);
-
-    bow.root.position.x += bow.position[0];
-    bow.root.position.y += bow.position[1];
-    bow.root.position.z += bow.position[2];
-    const rotation = degToRad3(bow.rotation);
-    bow.root.rotation.set(...rotation);
-    bow.root.scale.multiplyScalar(bow.scale);
-    
-    linkHand.add(bow.root);
-    console.log(dumpObject(bow.root));
+    linkHand.attach(bow);
 }
+
+
+// function buildBow() {
+//     const bow = models.bow;
+//     const clonedScene = SkeletonUtils.clone(bow.gltf.scene);
+
+//     scene.updateMatrixWorld();
+
+//     var linkHand = models.link.root.getObjectByName('handL');
+
+//     bow.root = clonedScene.children[0];
+//     bow.root.add(clonedScene);
+
+//     bow.root.position.x += bow.position[0];
+//     bow.root.position.y += bow.position[1];
+//     bow.root.position.z += bow.position[2];
+//     const rotation = degToRad3(bow.rotation);
+//     bow.root.rotation.set(...rotation);
+//     bow.root.scale.multiplyScalar(bow.scale);
+    
+//     linkHand.add(bow.root);
+//     console.log(dumpObject(bow.root));
+// }
 
 function buildTarget() {
     const target = models.target;
@@ -223,23 +247,30 @@ function buildScene() {
     scene = new THREE.Scene();
     scene.background = new THREE.Color( fogColor );
 
-    createCamera();
     createLight();
     createFog();
 
     createGround();  
     buildModels();
+
+    createCamera();
 }
 
 function createFog() {
     scene.fog = new THREE.Fog( fogColor, fogNear, fogFar );
 }
 
+// Third person camera
 function createCamera() {
-    camera = new THREE.PerspectiveCamera(fov, aspect, near, far);
+    camera = new THREE.PerspectiveCamera(fov, aspect, near, far);    
+    const link = models.link.root;
+
     camera.position.set( ...cameraPosition );
-    camera.position.multiplyScalar( cameraDistance )
-    camera.lookAt( scene.position );
+    var target = [link.position.x, link.position.y, link.position.z];
+    target[1] += 2;
+    camera.lookAt( ...target );
+    
+    link.add( camera );
 }
 
 function createDirectionalLight() {
@@ -299,14 +330,149 @@ function createGround() {
 // HANDLING FUNCTIONS
 // ============================================================================
 
-function handleControls() {
+function initGUI() {
+    var instructions = document.getElementById( 'instructions' );
+    var blocker = document.getElementById( 'blocker' );
+
+    instructions.style.display = 'none';
+    blocker.style.display = 'none';
+}
+
+function pointerLockControls() {
+    controls = new PointerLockControls( camera, document.body );
+    var instructions = document.getElementById( 'instructions' );
+
+    blocker.style.display = 'block';
+    instructions.style.display = '';
+
+    instructions.addEventListener( 'click', function () {
+
+        controls.lock();
+
+    }, false );
+
+    controls.addEventListener( 'lock', function () {
+
+        instructions.style.display = 'none';
+        blocker.style.display = 'none';
+
+    } );
+
+    controls.addEventListener( 'unlock', function () {
+
+        blocker.style.display = 'block';
+        instructions.style.display = '';
+
+    } );
+
+    // scene.add( controls.getObject() );
+
+    var onKeyDown = function ( event ) {
+
+        switch ( event.keyCode ) {
+
+            case 38: // up
+            case 87: // w
+                moveForward = true;
+                break;
+
+            case 37: // left
+            case 65: // a
+                moveLeft = true;
+                break;
+
+            case 40: // down
+            case 83: // s
+                moveBackward = true;
+                break;
+
+            case 39: // right
+            case 68: // d
+                moveRight = true;
+                break;
+
+            case 32: // space
+                if ( canJump === true ) velocity.y += 350;
+                canJump = false;
+                break;
+
+        }
+
+    };
+
+    var onKeyUp = function ( event ) {
+
+        switch ( event.keyCode ) {
+
+            case 38: // up
+            case 87: // w
+                moveForward = false;
+                break;
+
+            case 37: // left
+            case 65: // a
+                moveLeft = false;
+                break;
+
+            case 40: // down
+            case 83: // s
+                moveBackward = false;
+                break;
+
+            case 39: // right
+            case 68: // d
+                moveRight = false;
+                break;
+
+        }
+
+    };
+
+    document.addEventListener( 'keydown', onKeyDown, false );
+    document.addEventListener( 'keyup', onKeyUp, false );
+}
+
+function orbitControls() {
     controls = new OrbitControls( camera, renderer.domElement );
     controls.minPolarAngle = 0.0;
     controls.maxPolarAngle = Math.PI * 0.5 - 0.1;
     controls.target.set(0, 0, 0);
     controls.update();
+}
 
-    
+function handleControls() {
+    // orbitControls();
+    pointerLockControls();
+}
+ 
+function moveCamera() {
+    var time = performance.now();
+    var delta = ( time - prevTime ) / 1000;
+
+    velocity.x -= velocity.x * 10.0 * delta;
+    velocity.z -= velocity.z * 10.0 * delta;
+
+    direction.z = Number( moveForward ) - Number( moveBackward );
+    direction.x = Number( moveRight ) - Number( moveLeft );
+    direction.normalize(); // this ensures consistent movements in all directions
+
+    if ( moveForward || moveBackward ) velocity.z -= direction.z * 400.0 * delta;
+    if ( moveLeft || moveRight ) velocity.x -= direction.x * 400.0 * delta;
+
+    controls.moveRight( - velocity.x * delta );
+    controls.moveForward( - velocity.z * delta );
+
+    controls.getObject().position.y += ( velocity.y * delta ); // new behavior
+
+    if ( controls.getObject().position.y < cameraPosition[1] ) {
+        velocity.y = 0;
+        controls.getObject().position.y = cameraPosition[1];
+        canJump = true;
+    } else {
+        velocity.y -= 9.8 * 100.0 * delta; // 100.0 = mass
+    }
+
+    prevTime = time;
 }
 
 // ============================================================================
@@ -325,11 +491,14 @@ function render(time) {
     
     TWEEN.update();
     
+    moveCamera();
+    
     renderer.render(scene, camera);
     requestAnimationFrame(render);
 }
 
 function main() {
+    // initGUI();
     if (!modelsLoaded) {
         loadAssets(main);
     } else {
