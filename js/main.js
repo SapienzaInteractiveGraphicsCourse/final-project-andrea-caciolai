@@ -1,7 +1,8 @@
 import * as THREE from '../lib/three.js/build/three.module.js'
 import {GLTFLoader} from '../lib/three.js/examples/jsm/loaders/GLTFLoader.js'
 import { OrbitControls } from '../lib/three.js/examples/jsm/controls/OrbitControls.js';
-import { PointerLockControls } from '../lib/three.js/examples/jsm/controls/PointerLockControls.js';
+// import { PointerLockControls } from '../lib/three.js/examples/jsm/controls/PointerLockControls.js';
+import { PointerLockControls } from './controls.js';
 import TWEEN from '../lib/tween.js/dist/tween.esm.js'
 
 import {SkeletonUtils} from '../lib/three.js/examples/jsm/utils/SkeletonUtils.js';
@@ -17,7 +18,7 @@ var loadingManager;
 var controls;
 
 // Objects variables
-var camera;
+var thirdPersonCamera;
 var scene;
 var light;
 var ambient;
@@ -94,6 +95,11 @@ var moveLeft = false;
 var moveRight = false;
 var canJump = false;
 
+const friction = 10.0;
+const moveSpeed = 200.0;
+const jumpSpeed = 200.0;
+const mass = 100.0;
+
 var prevTime = performance.now();
 var velocity = new THREE.Vector3();
 var direction = new THREE.Vector3();
@@ -164,19 +170,6 @@ function buildModels() {
     }
 }
 
-// function buildLink() {
-//     const link = models.link;
-//     const clonedScene = SkeletonUtils.clone(link.gltf.scene);
-//     link.root = clonedScene.children[0];
-    
-//     link.root.position.set(...link.position);
-//     link.root.scale.multiplyScalar(link.scale);
-//     const rotation = degToRad3(link.rotation);
-//     link.root.rotation.set(...rotation);
-        
-//     scene.add( link.root );
-//     console.log(dumpObject(link.root));
-// }
 
 function buildLink() {
     const link = models.link;
@@ -253,7 +246,7 @@ function buildScene() {
     createGround();  
     buildModels();
 
-    createCamera();
+    createThirdPersonCamera();
 }
 
 function createFog() {
@@ -261,16 +254,16 @@ function createFog() {
 }
 
 // Third person camera
-function createCamera() {
-    camera = new THREE.PerspectiveCamera(fov, aspect, near, far);    
+function createThirdPersonCamera() {
+    thirdPersonCamera = new THREE.PerspectiveCamera(fov, aspect, near, far);    
     const link = models.link.root;
 
-    camera.position.set( ...cameraPosition );
+    thirdPersonCamera.position.set( ...cameraPosition );
     var target = [link.position.x, link.position.y, link.position.z];
     target[1] += 2;
-    camera.lookAt( ...target );
+    thirdPersonCamera.lookAt( ...target );
     
-    link.add( camera );
+    link.add( thirdPersonCamera );
 }
 
 function createDirectionalLight() {
@@ -338,8 +331,12 @@ function initGUI() {
     blocker.style.display = 'none';
 }
 
-function pointerLockControls() {
-    controls = new PointerLockControls( camera, document.body );
+function thirdPersonCameraControls() {
+    const link = models.link.root;
+    controls = new PointerLockControls( link, document.body );
+    
+    controls.enableMouseVertical = false;
+
     var instructions = document.getElementById( 'instructions' );
 
     blocker.style.display = 'block';
@@ -392,7 +389,7 @@ function pointerLockControls() {
                 break;
 
             case 32: // space
-                if ( canJump === true ) velocity.y += 350;
+                if ( canJump === true ) velocity.y += jumpSpeed;
                 canJump = false;
                 break;
 
@@ -433,7 +430,7 @@ function pointerLockControls() {
 }
 
 function orbitControls() {
-    controls = new OrbitControls( camera, renderer.domElement );
+    controls = new OrbitControls( thirdPersonCamera, renderer.domElement );
     controls.minPolarAngle = 0.0;
     controls.maxPolarAngle = Math.PI * 0.5 - 0.1;
     controls.target.set(0, 0, 0);
@@ -442,34 +439,39 @@ function orbitControls() {
 
 function handleControls() {
     // orbitControls();
-    pointerLockControls();
+    thirdPersonCameraControls();
 }
  
-function moveCamera() {
+function updateThirdPersonCamera() {
     var time = performance.now();
-    var delta = ( time - prevTime ) / 1000;
+    var dt = ( time - prevTime ) / 1000;
 
-    velocity.x -= velocity.x * 10.0 * delta;
-    velocity.z -= velocity.z * 10.0 * delta;
+    // Apply friction
+    velocity.x -= velocity.x * friction * dt;
+    velocity.z -= velocity.z * friction * dt;
 
+    // Update velocity based on current direction
     direction.z = Number( moveForward ) - Number( moveBackward );
     direction.x = Number( moveRight ) - Number( moveLeft );
     direction.normalize(); // this ensures consistent movements in all directions
 
-    if ( moveForward || moveBackward ) velocity.z -= direction.z * 400.0 * delta;
-    if ( moveLeft || moveRight ) velocity.x -= direction.x * 400.0 * delta;
+    if ( moveForward || moveBackward ) velocity.z -= direction.z * moveSpeed * dt;
+    if ( moveLeft || moveRight ) velocity.x -= direction.x * moveSpeed * dt;
 
-    controls.moveRight( - velocity.x * delta );
-    controls.moveForward( - velocity.z * delta );
+    // Update position
+    controls.moveRight( velocity.x * dt );
+    controls.moveForward( velocity.z * dt );
 
-    controls.getObject().position.y += ( velocity.y * delta ); // new behavior
+    // Update vertical position
+    controls.getObject().position.y += ( velocity.y * dt ); // new behavior
 
-    if ( controls.getObject().position.y < cameraPosition[1] ) {
+    // Check vertical position (no infinite falling)
+    if ( controls.getObject().position.y < 0 ) {
         velocity.y = 0;
-        controls.getObject().position.y = cameraPosition[1];
+        controls.getObject().position.y = 0;
         canJump = true;
     } else {
-        velocity.y -= 9.8 * 100.0 * delta; // 100.0 = mass
+        velocity.y -= 9.8 * mass * dt; // 100.0 = mass
     }
 
     prevTime = time;
@@ -481,8 +483,8 @@ function moveCamera() {
 
 
 function onWindowResize() {
-    camera.aspect = window.innerWidth / window.innerHeight;
-    camera.updateProjectionMatrix();
+    thirdPersonCamera.aspect = window.innerWidth / window.innerHeight;
+    thirdPersonCamera.updateProjectionMatrix();
     renderer.setSize( window.innerWidth, window.innerHeight );
 }
 
@@ -491,9 +493,9 @@ function render(time) {
     
     TWEEN.update();
     
-    moveCamera();
+    updateThirdPersonCamera();
     
-    renderer.render(scene, camera);
+    renderer.render(scene, thirdPersonCamera);
     requestAnimationFrame(render);
 }
 
