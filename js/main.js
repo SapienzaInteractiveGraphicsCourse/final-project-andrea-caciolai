@@ -56,7 +56,7 @@ const shadowCameraDepth = 1000;
 // Model variables
 var modelsLoaded = false;
 var modelsMap;
-var modelsList;
+var loadModelsList;
 
 modelsMap = {
     link:    { 
@@ -65,6 +65,39 @@ modelsMap = {
         rotation: [ 0, 0, 0, ],
         scale: 10,
         buildCallback: buildLink,
+        joints: {
+            upper: {
+                left: {
+                    arm: null,
+                    forearm: null,
+                    hand: null,
+                },
+                right: {
+                    arm: null,
+                    forearm: null,
+                    hand: null,
+                }
+            },
+            lower: {
+                left: {
+                    thigh: null,
+                    shin: null,
+                    foot: null,
+                    toe: null,
+                },
+                right: {
+                    thigh: null,
+                    shin: null,
+                    foot: null,
+                    toe: null,
+                },
+            }   
+        }
+    },
+    bow: {
+        joints: {
+            string: null,
+        }
     },
     target:  { 
         url: '../assets/models/target/target.gltf',
@@ -82,7 +115,7 @@ modelsMap = {
 };
 
 
-modelsList = [modelsMap.link, modelsMap.target, modelsMap.arrow];
+loadModelsList = [modelsMap.link, modelsMap.target, modelsMap.arrow];
 
 // Controls parameters
 var moveForward = false;
@@ -139,7 +172,7 @@ function loadModels(callback) {
     };
     
     const gltfLoader = new GLTFLoader(loadingManager);
-    modelsList.forEach( model => {
+    loadModelsList.forEach( model => {
         gltfLoader.load(model.url, (gltf) => {
             gltf.scene.traverse( function ( child ) {
                 if ( child.isMesh ) {
@@ -160,12 +193,67 @@ function buildModels() {
     const loadingElem = document.querySelector('#loading');
     loadingElem.style.display = 'none';
 
-    modelsList.forEach( model => {
+    loadModelsList.forEach( model => {
         // const root = new THREE.Object3D();
         model.buildCallback();
     });
 }
 
+function initLinkJoints() {
+    const link = modelsMap.link;
+
+    link.root.traverse(obj => {
+        // Upper left limbs
+        if (obj.isBone && obj.name === 'upper_armL') {
+            link.joints.upper.left.arm = obj;
+        }
+        if (obj.isBone && obj.name === 'forearmL') {
+            link.joints.upper.left.forearm = obj;
+        }
+        if (obj.isBone && obj.name === 'handL') {
+            link.joints.upper.left.hand = obj;
+        }
+    
+        // Upper right limbs
+        if (obj.isBone && obj.name === 'upper_armR') {
+            link.joints.upper.right.arm = obj;
+        }
+        if (obj.isBone && obj.name === 'forearmR') {
+            link.joints.upper.right.forearm = obj;
+        }
+        if (obj.isBone && obj.name === 'handR') {
+            link.joints.upper.right.hand = obj;
+        }
+    
+        // Lower left limbs
+        if (obj.isBone && obj.name === 'thighL') {
+            link.joints.lower.left.thigh = obj;
+        }
+        if (obj.isBone && obj.name === 'shinL') {
+            link.joints.lower.left.shin = obj;
+        }
+        if (obj.isBone && obj.name === 'footL') {
+            link.joints.lower.left.foot = obj;
+        }
+        if (obj.isBone && obj.name === 'toeL') {
+            link.joints.lower.left.toe = obj;
+        }
+    
+        // Lower right limbs
+        if (obj.isBone && obj.name === 'thighR') {
+            link.joints.lower.right.thigh = obj;
+        }
+        if (obj.isBone && obj.name === 'shinR') {
+            link.joints.lower.right.shin = obj;
+        }
+        if (obj.isBone && obj.name === 'footR') {
+            link.joints.lower.right.foot = obj;
+        }
+        if (obj.isBone && obj.name === 'toeR') {
+            link.joints.lower.right.toe = obj;
+        }
+    });
+}
 
 function buildLink() {
     const link = modelsMap.link;
@@ -180,7 +268,17 @@ function buildLink() {
     scene.add( link.root );
     
     buildBow();
+
+    initLinkJoints();
+
+    console.log(link.joints);
     console.log(dumpObject(link.root));
+}
+
+function initBowJoints() {
+    const bow = modelsMap.bow;
+    const string = modelsMap.link.root.getObjectByName('string');
+    bow.joints.string = string;
 }
 
 function buildBow() {
@@ -189,7 +287,9 @@ function buildBow() {
     var linkHand = modelsMap.link.root.getObjectByName('handL');
     var bow = modelsMap.link.root.getObjectByName('Bow');
 
+    modelsMap.bow.root = bow;
     linkHand.attach(bow);
+    initBowJoints();
 }
 
 

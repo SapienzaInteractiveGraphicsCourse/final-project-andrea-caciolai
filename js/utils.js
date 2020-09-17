@@ -34,3 +34,20 @@ export function vec3ToArr(vec) {
 export function ArrToVec3(arr) {
     return new THREE.Vector3(arr[0], arr[1], arr[2]);
 }
+
+
+export function pauseTweens(tweens) {
+	tweens.forEach( 
+		(tween) => {
+			tween.pause();
+		} 
+	);
+}
+
+export function resumeTweens(tweens) {
+	tweens.forEach( 
+		(tween) => {
+			tween.resume();
+		} 
+	);	
+}
