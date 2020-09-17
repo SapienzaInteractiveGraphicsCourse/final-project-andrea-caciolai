@@ -2,7 +2,7 @@ import * as THREE from '../lib/three.js/build/three.module.js'
 import {GLTFLoader} from '../lib/three.js/examples/jsm/loaders/GLTFLoader.js'
 import { OrbitControls } from '../lib/three.js/examples/jsm/controls/OrbitControls.js';
 // import { PointerLockControls } from '../lib/three.js/examples/jsm/controls/PointerLockControls.js';
-import { PointerLockControls } from './controls.js';
+import { CustomPointerLockControls } from './controls.js';
 import TWEEN from '../lib/tween.js/dist/tween.esm.js'
 
 import {SkeletonUtils} from '../lib/three.js/examples/jsm/utils/SkeletonUtils.js';
@@ -333,7 +333,7 @@ function initGUI() {
 
 function thirdPersonCameraControls() {
     const link = models.link.root;
-    controls = new PointerLockControls( link, document.body );
+    controls = new CustomPointerLockControls( link, document.body );
     
     controls.enableMouseVertical = false;
 
