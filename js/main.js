@@ -6,7 +6,7 @@ import { CustomPointerLockControls } from './controls.js';
 import TWEEN from '../lib/tween.js/dist/tween.esm.js'
 
 import {SkeletonUtils} from '../lib/three.js/examples/jsm/utils/SkeletonUtils.js';
-import {dumpObject, degToRad, degToRad3} from './utils.js'
+import {dumpObject, degToRad, degToRad3, vec3ToArr} from './utils.js'
 
 // ============================================================================
 // GLOBAL VARIABLES AND PARAMETERS
@@ -22,7 +22,7 @@ var thirdPersonCamera;
 var scene;
 var light;
 var ambient;
-var models;
+
 
 // Camera parameters
 const fov = 45;
@@ -55,15 +55,10 @@ const shadowCameraDepth = 1000;
 
 // Model variables
 var modelsLoaded = false;
+var modelsMap;
+var modelsList;
 
-models = {
-    // link:    { 
-    //     url: '../assets/models/link/link.gltf',
-    //     position: [ 0, 0, 0 ],
-    //     rotation: [ 0, 0, 0, ],
-    //     scale: 10,
-    //     buildCallback: buildLink,
-    // },
+modelsMap = {
     link:    { 
         url: '../assets/models/link_with_bow/link_with_bow.gltf',
         position: [ 0, 0, 0 ],
@@ -78,15 +73,16 @@ models = {
         scale: 10,
         buildCallback: buildTarget,
     },
-    // bow: {
-    //     url: '../assets/models/bow/bow.gltf',
-    //     name: 'Bow',
-    //     position: [-0.05, 0.15, 0.05],
-    //     rotation: [-180, 90, 90],
-    //     scale: 0.05,
-    //     buildCallback: buildBow,
-    // }
+    arrow: {
+        url: '../assets/models/arrow/arrow.gltf',
+        rotation: [0, 0, 0],
+        scale: 22,
+        buildCallback: buildArrow,
+    }
 };
+
+
+modelsList = [modelsMap.link, modelsMap.target, modelsMap.arrow];
 
 // Controls parameters
 var moveForward = false;
@@ -96,7 +92,7 @@ var moveRight = false;
 var canJump = false;
 
 const friction = 10.0;
-const moveSpeed = 200.0;
+const moveSpeed = 100.0;
 const jumpSpeed = 200.0;
 const mass = 100.0;
 
@@ -143,7 +139,7 @@ function loadModels(callback) {
     };
     
     const gltfLoader = new GLTFLoader(loadingManager);
-    for (const model of Object.values(models)) {
+    modelsList.forEach( model => {
         gltfLoader.load(model.url, (gltf) => {
             gltf.scene.traverse( function ( child ) {
                 if ( child.isMesh ) {
@@ -157,22 +153,22 @@ function loadModels(callback) {
             } );
             model.gltf = gltf;
         });
-    }
+    });
 }
 
 function buildModels() {
     const loadingElem = document.querySelector('#loading');
     loadingElem.style.display = 'none';
 
-    for (const model of Object.values(models)) {
+    modelsList.forEach( model => {
         // const root = new THREE.Object3D();
         model.buildCallback();
-    }
+    });
 }
 
 
 function buildLink() {
-    const link = models.link;
+    const link = modelsMap.link;
     const clonedScene = SkeletonUtils.clone(link.gltf.scene);
     link.root = clonedScene.children[0];
     
@@ -180,47 +176,25 @@ function buildLink() {
     link.root.scale.multiplyScalar(link.scale);
     const rotation = degToRad3(link.rotation);
     link.root.rotation.set(...rotation);
-    
-    buildBow();
 
     scene.add( link.root );
+    
+    buildBow();
     console.log(dumpObject(link.root));
 }
 
 function buildBow() {
     scene.updateMatrixWorld();
 
-    var linkHand = models.link.root.getObjectByName('handL');
-    var bow = models.link.root.getObjectByName('Bow');
+    var linkHand = modelsMap.link.root.getObjectByName('handL');
+    var bow = modelsMap.link.root.getObjectByName('Bow');
 
     linkHand.attach(bow);
 }
 
 
-// function buildBow() {
-//     const bow = models.bow;
-//     const clonedScene = SkeletonUtils.clone(bow.gltf.scene);
-
-//     scene.updateMatrixWorld();
-
-//     var linkHand = models.link.root.getObjectByName('handL');
-
-//     bow.root = clonedScene.children[0];
-//     bow.root.add(clonedScene);
-
-//     bow.root.position.x += bow.position[0];
-//     bow.root.position.y += bow.position[1];
-//     bow.root.position.z += bow.position[2];
-//     const rotation = degToRad3(bow.rotation);
-//     bow.root.rotation.set(...rotation);
-//     bow.root.scale.multiplyScalar(bow.scale);
-    
-//     linkHand.add(bow.root);
-//     console.log(dumpObject(bow.root));
-// }
-
 function buildTarget() {
-    const target = models.target;
+    const target = modelsMap.target;
     target.root = target.gltf.scene.children[0];
     
     target.root.position.set(...target.position);
@@ -231,6 +205,26 @@ function buildTarget() {
     scene.add( target.root );
     console.log(dumpObject(target.root));
 }
+
+function buildArrow() {
+    const arrow = modelsMap.arrow;
+    
+    arrow.root = new THREE.Object3D();
+    arrow.root.name = "Arrow";
+    arrow.root.add(arrow.gltf.scene.children[0]);
+
+    var bow = modelsMap.link.root.getObjectByName('Bow');
+    
+    bow.add( arrow.root );
+    
+    arrow.root.scale.multiplyScalar(arrow.scale);
+    const rotation = degToRad3(arrow.rotation);
+    arrow.root.rotation.set(...rotation);
+    
+    console.log(dumpObject(arrow.root));
+}
+
+
 
 // ============================================================================
 // SCENE BUILDING FUNCTIONS
@@ -256,7 +250,7 @@ function createFog() {
 // Third person camera
 function createThirdPersonCamera() {
     thirdPersonCamera = new THREE.PerspectiveCamera(fov, aspect, near, far);    
-    const link = models.link.root;
+    const link = modelsMap.link.root;
 
     thirdPersonCamera.position.set( ...cameraPosition );
     var target = [link.position.x, link.position.y, link.position.z];
@@ -332,7 +326,7 @@ function initGUI() {
 }
 
 function thirdPersonCameraControls() {
-    const link = models.link.root;
+    const link = modelsMap.link.root;
     controls = new CustomPointerLockControls( link, document.body );
     
     controls.enableMouseVertical = false;
