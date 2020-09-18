@@ -2,7 +2,7 @@ import * as THREE from '../lib/three.js/build/three.module.js'
 import {GLTFLoader} from '../lib/three.js/examples/jsm/loaders/GLTFLoader.js'
 import { OrbitControls } from '../lib/three.js/examples/jsm/controls/OrbitControls.js';
 // import { PointerLockControls } from '../lib/three.js/examples/jsm/controls/PointerLockControls.js';
-import { CustomPointerLockControls } from './controls.js';
+import { CustomPointerLockControls, AimPointerLockControls } from './controls.js';
 import TWEEN from '../lib/tween.js/dist/tween.esm.js'
 
 import {SkeletonUtils} from '../lib/three.js/examples/jsm/utils/SkeletonUtils.js';
@@ -22,6 +22,10 @@ var thirdPersonCamera;
 var scene;
 var light;
 var ambient;
+
+var modelsLoaded = false;
+var sceneBuilt = false;
+var controlsSet = false;
 
 
 // Camera parameters
@@ -54,7 +58,6 @@ const shadowCameraHeight = 100;
 const shadowCameraDepth = 1000;
 
 // Model variables
-var modelsLoaded = false;
 var modelsMap;
 var loadModelsList;
 
@@ -140,7 +143,7 @@ function loadAssets() {
     textureLoader = new THREE.TextureLoader();
     loadingManager = new THREE.LoadingManager();
 
-    loadModels(main);
+    loadModels();
 }
 
 function init() {
@@ -157,13 +160,13 @@ function init() {
 // MODEL(s) CODE (Loading, building, displaying)
 // ============================================================================
 
-function loadModels(callback) {   
+function loadModels() {   
     loadingManager.onLoad = function() {
         console.log('Loading complete!');
         // hide the loading bar
         document.querySelector('#loading').hidden = true;
         modelsLoaded = true;
-        callback();
+        main();
     };
 
     const progressbarElem = document.querySelector('#progressbar');
@@ -341,6 +344,9 @@ function buildScene() {
     buildModels();
 
     createThirdPersonCamera();
+
+    sceneBuilt = true;
+    main();
 }
 
 function createFog() {
@@ -417,13 +423,6 @@ function createGround() {
 // HANDLING FUNCTIONS
 // ============================================================================
 
-function initGUI() {
-    var instructions = document.getElementById( 'instructions' );
-    var blocker = document.getElementById( 'blocker' );
-
-    instructions.style.display = 'none';
-    blocker.style.display = 'none';
-}
 
 function thirdPersonCameraControls() {
     const link = modelsMap.link.root;
@@ -523,17 +522,66 @@ function thirdPersonCameraControls() {
     document.addEventListener( 'keyup', onKeyUp, false );
 }
 
+function bowVerticalControls() {
+
+    var instructions = document.getElementById( 'instructions' );
+
+    blocker.style.display = 'block';
+    instructions.style.display = '';
+
+    const link = modelsMap.link;
+    const armL = link.joints.upper.left.arm;
+    const armR = link.joints.upper.right.arm;
+
+    // Controls for left and right arm (and bow)
+    var bowControlsL = new AimPointerLockControls( armL, document.body );
+    var bowControlsR = new AimPointerLockControls( armR, document.body );
+    bowControlsR.inverted = true;
+    
+    var bowControlsArray = [bowControlsL, bowControlsR];
+
+    // Assign listeners
+    bowControlsArray.forEach(bowControls => {
+        bowControls.minPolarAngle = 0.25 * Math.PI;
+        bowControls.maxPolarAngle = 0.75 * Math.PI;
+
+        instructions.addEventListener( 'click', function () {
+
+            bowControls.lock();
+    
+        }, false );
+    
+        bowControls.addEventListener( 'lock', function () {
+    
+            instructions.style.display = 'none';
+            blocker.style.display = 'none';
+    
+        } );
+    
+        bowControls.addEventListener( 'unlock', function () {
+    
+            blocker.style.display = 'block';
+            instructions.style.display = '';
+    
+        } ); 
+    });
+}
+
 function orbitControls() {
-    controls = new OrbitControls( thirdPersonCamera, renderer.domElement );
-    controls.minPolarAngle = 0.0;
-    controls.maxPolarAngle = Math.PI * 0.5 - 0.1;
-    controls.target.set(0, 0, 0);
-    controls.update();
+    var orbit = new OrbitControls( thirdPersonCamera, renderer.domElement );
+    orbit.minPolarAngle = 0.0;
+    orbit.maxPolarAngle = Math.PI * 0.5 - 0.1;
+    orbit.target.set(0, 0, 0);
+    orbit.update();
 }
 
 function handleControls() {
     // orbitControls();
     thirdPersonCameraControls();
+    bowVerticalControls();
+    
+    controlsSet = true;
+    main();
 }
  
 function updateThirdPersonCamera() {
@@ -594,15 +642,22 @@ function render(time) {
 }
 
 function main() {
-    // initGUI();
     if (!modelsLoaded) {
-        loadAssets(main);
-    } else {
+        loadAssets();
+        return;
+    }
+    
+    if (!sceneBuilt) {
         init();
         buildScene();
-        handleControls();
-
-        requestAnimationFrame(render);
+        return;
     }
+
+    if (!controlsSet) {
+        handleControls();
+        return;
+    }
+    
+    requestAnimationFrame(render);
 }
 main();
