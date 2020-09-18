@@ -1,3 +1,4 @@
+import * as THREE from '../lib/three.js/build/three.module.js'
 
 // ============================================================================
 // UTILITY FUNCTIONS
@@ -34,6 +35,7 @@ export function vec3ToArr(vec) {
 export function ArrToVec3(arr) {
     return new THREE.Vector3(arr[0], arr[1], arr[2]);
 }
+
 
 
 export function pauseTweens(tweens) {

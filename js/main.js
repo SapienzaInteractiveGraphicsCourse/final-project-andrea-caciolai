@@ -5,6 +5,7 @@ import { OrbitControls } from '../lib/three.js/examples/jsm/controls/OrbitContro
 import { CustomPointerLockControls, AimPointerLockControls } from './controls.js';
 import TWEEN from '../lib/tween.js/dist/tween.esm.js'
 
+import {SceneUtils} from '../lib/three.js/examples/jsm/utils/SceneUtils.js'
 import {SkeletonUtils} from '../lib/three.js/examples/jsm/utils/SkeletonUtils.js';
 import {dumpObject, degToRad, degToRad3, vec3ToArr} from './utils.js'
 
@@ -15,10 +16,11 @@ import {dumpObject, degToRad, degToRad3, vec3ToArr} from './utils.js'
 var renderer;
 var textureLoader;
 var loadingManager;
-var controls;
+var gamePaused = true;
 
 // Objects variables
 var thirdPersonCamera;
+var arrowCamera;
 var scene;
 var light;
 var ambient;
@@ -26,6 +28,8 @@ var ambient;
 var modelsLoaded = false;
 var sceneBuilt = false;
 var controlsSet = false;
+
+var playerControls;
 
 
 // Camera parameters
@@ -127,14 +131,29 @@ var moveLeft = false;
 var moveRight = false;
 var canJump = false;
 
-const friction = 10.0;
-const moveSpeed = 100.0;
-const jumpSpeed = 200.0;
-const mass = 100.0;
+var canShoot = true;
+var shooting = false;
+
+// Link movement variables and params
+const floorFriction = 10.0;
+const linkMoveSpeed = 100.0;
+const linkJumpSpeed = 200.0;
+const linkMass = 100.0;
 
 var prevTime = performance.now();
 var velocity = new THREE.Vector3();
 var direction = new THREE.Vector3();
+
+// Arrow movement variables and params
+
+var shootInitTime;
+var shootFinalTime;
+
+const arrowForce = 10.0;
+const arrowMass = 1.0; 
+const maxCharge = 2;
+const g = 9.81;
+
 
 // ============================================================================
 // INITIALIZATION FUNCTIONS
@@ -328,7 +347,6 @@ function buildArrow() {
 }
 
 
-
 // ============================================================================
 // SCENE BUILDING FUNCTIONS
 // ============================================================================
@@ -344,6 +362,7 @@ function buildScene() {
     buildModels();
 
     createThirdPersonCamera();
+    createArrowCamera();
 
     sceneBuilt = true;
     main();
@@ -364,6 +383,10 @@ function createThirdPersonCamera() {
     thirdPersonCamera.lookAt( ...target );
     
     link.add( thirdPersonCamera );
+}
+
+function createArrowCamera() {
+
 }
 
 function createDirectionalLight() {
@@ -426,9 +449,9 @@ function createGround() {
 
 function thirdPersonCameraControls() {
     const link = modelsMap.link.root;
-    controls = new CustomPointerLockControls( link, document.body );
+    playerControls = new CustomPointerLockControls( link, document.body );
     
-    controls.enableMouseVertical = false;
+    playerControls.enableMouseVertical = false;
 
     var instructions = document.getElementById( 'instructions' );
 
@@ -437,22 +460,22 @@ function thirdPersonCameraControls() {
 
     instructions.addEventListener( 'click', function () {
 
-        controls.lock();
+        playerControls.lock();
 
     }, false );
 
-    controls.addEventListener( 'lock', function () {
+    playerControls.addEventListener( 'lock', function () {
 
         instructions.style.display = 'none';
         blocker.style.display = 'none';
-
+        gamePaused = false;
     } );
 
-    controls.addEventListener( 'unlock', function () {
+    playerControls.addEventListener( 'unlock', function () {
 
         blocker.style.display = 'block';
         instructions.style.display = '';
-
+        gamePaused = true;
     } );
 
     // scene.add( controls.getObject() );
@@ -482,7 +505,7 @@ function thirdPersonCameraControls() {
                 break;
 
             case 32: // space
-                if ( canJump === true ) velocity.y += jumpSpeed;
+                if ( canJump === true ) velocity.y += linkJumpSpeed;
                 canJump = false;
                 break;
 
@@ -555,14 +578,14 @@ function bowVerticalControls() {
     
             instructions.style.display = 'none';
             blocker.style.display = 'none';
-    
+            gamePaused = false;
         } );
     
         bowControls.addEventListener( 'unlock', function () {
     
             blocker.style.display = 'block';
             instructions.style.display = '';
-    
+            gamePaused = true;
         } ); 
     });
 }
@@ -575,10 +598,35 @@ function orbitControls() {
     orbit.update();
 }
 
+function shootControls () {
+    var onClickPressed = function (event) {
+        if (gamePaused) return;
+        if (!canShoot) return;
+        if (shooting) return;
+
+        shooting = true;
+        shootInitTime = performance.now();
+    };
+
+    var onClickRelease = function (event) {
+        if (gamePaused) return;
+        if (!shooting) return;
+
+        canShoot = false;
+        shootFinalTime = performance.now();
+        shooting = false;
+        shootArrow();
+    };
+
+    document.addEventListener('mousedown', onClickPressed, false);
+    document.addEventListener('mouseup', onClickRelease, false);
+}
+
 function handleControls() {
     // orbitControls();
     thirdPersonCameraControls();
     bowVerticalControls();
+    shootControls();
     
     controlsSet = true;
     main();
@@ -589,35 +637,169 @@ function updateThirdPersonCamera() {
     var dt = ( time - prevTime ) / 1000;
 
     // Apply friction
-    velocity.x -= velocity.x * friction * dt;
-    velocity.z -= velocity.z * friction * dt;
+    velocity.x -= velocity.x * floorFriction * dt;
+    velocity.z -= velocity.z * floorFriction * dt;
 
     // Update velocity based on current direction
     direction.z = Number( moveForward ) - Number( moveBackward );
     direction.x = Number( moveRight ) - Number( moveLeft );
     direction.normalize(); // this ensures consistent movements in all directions
 
-    if ( moveForward || moveBackward ) velocity.z -= direction.z * moveSpeed * dt;
-    if ( moveLeft || moveRight ) velocity.x -= direction.x * moveSpeed * dt;
+    if ( moveForward || moveBackward ) velocity.z -= direction.z * linkMoveSpeed * dt;
+    if ( moveLeft || moveRight ) velocity.x -= direction.x * linkMoveSpeed * dt;
 
     // Update position
-    controls.moveRight( velocity.x * dt );
-    controls.moveForward( velocity.z * dt );
+    playerControls.moveRight( velocity.x * dt );
+    playerControls.moveForward( velocity.z * dt );
 
     // Update vertical position
-    controls.getObject().position.y += ( velocity.y * dt ); // new behavior
+    playerControls.getObject().position.y += ( velocity.y * dt ); // new behavior
 
     // Check vertical position (no infinite falling)
-    if ( controls.getObject().position.y < 0 ) {
+    if ( playerControls.getObject().position.y < 0 ) {
         velocity.y = 0;
-        controls.getObject().position.y = 0;
+        playerControls.getObject().position.y = 0;
         canJump = true;
     } else {
-        velocity.y -= 9.8 * mass * dt; // 100.0 = mass
+        velocity.y -= 9.8 * linkMass * dt; // 100.0 = mass
     }
 
     prevTime = time;
 }
+
+// ============================================================================
+// ANIMATION FUNCTIONS
+// ============================================================================
+
+function computeArrowDirection() {
+    // World axis: 
+    // links rotation (x axis)
+    // arrow up/down (y axis)
+    const arrow = modelsMap.arrow.root;
+    
+    var dir = new THREE.Vector3();
+    arrow.getWorldDirection(dir);
+    return dir;
+}
+
+function computeArrowInitialVelocity(direction) {
+    var charge = (shootFinalTime - shootInitTime) * 0.001;
+    var deltaT = Math.min(charge, maxCharge);
+    console.log(charge);
+
+    var impulse = arrowForce * deltaT;
+    var initialSpeed = impulse / arrowMass;
+    var initialVelocity = direction.multiplyScalar(initialSpeed);
+    return initialVelocity;
+}
+
+function computeArrowTrajectory(initialPosition, initialVelocity) {
+    var peak = new THREE.Vector3();
+    var final = new THREE.Vector3();
+
+    const y0 = initialPosition.y;
+    const vy0 = initialVelocity.y;
+    
+    // Compute time of flight
+    const t = (vy0 / g) * (1.0 + Math.sqrt( 1.0 + (2 * g * y0) / Math.pow(vy0, 2) ));
+
+    // Compute position at peak
+    peak.x = initialPosition.x + initialVelocity.x * (0.5 * t);
+    peak.y = y0 + vy0 * (0.5 * t) - ( 0.5 * g * Math.pow((0.5 * t), 2) );
+    peak.z = initialPosition.z + initialVelocity.z * (0.5 * t);
+
+    // Compute final position
+    final.x = initialPosition.x + initialVelocity.x * t;
+    final.y = 0.0;
+    final.z = initialPosition.z + initialVelocity.z * t;
+
+    return [t, peak, final];
+}
+
+function shootArrow() {
+    console.log("Arrow shot!");
+    const arrow = modelsMap.arrow.root;
+    
+    var bow = modelsMap.link.root.getObjectByName('Bow');
+    SceneUtils.detach(arrow, bow, scene);
+    
+    // Compute arrow trajectory
+    var dir = computeArrowDirection();
+
+    // Initial position
+    var arrowInitialPosition = new THREE.Vector3();
+    arrow.getWorldPosition(arrowInitialPosition);
+    
+    // Initial velocity
+    var arrowInitialVelocity = computeArrowInitialVelocity(dir);
+    
+    console.log("Initial position: " + vec3ToArr(arrowInitialPosition));
+    console.log("Initial velocity: " + vec3ToArr(arrowInitialVelocity));
+
+    var vy0 = arrowInitialVelocity.y;
+    var y0 = arrowInitialPosition.y;
+    
+    var time = vy0 + ( Math.sqrt(Math.pow(vy0, 2) + 2 * g * y0) / g );
+    var riseTime = vy0 / 2;
+    var fallTime = time - riseTime;
+    
+    shooting = false;
+    // canShoot = true;
+    
+    // Create tweens to update velocities (first and second half of parabolic trajectory)
+    var v = {x: arrowInitialVelocity.x, y: arrowInitialVelocity.y, z: arrowInitialVelocity.z};
+
+    var arrowTween1 = new TWEEN.Tween(v)
+    .to({x: arrowInitialVelocity.x, y: 0.0, z: arrowInitialVelocity.z},
+        1000 * riseTime)
+    .easing(TWEEN.Easing.Quadratic.In)
+    .onUpdate( 
+        () => {
+            arrow.position.x += v.x;
+            arrow.position.y += v.y;
+            arrow.position.z += v.z;
+        }
+    );
+
+    var arrowTween2 = new TWEEN.Tween(v)
+    .to({x: arrowInitialVelocity.x, y: -1.0 * arrowInitialVelocity.y, z: arrowInitialVelocity.z}, 
+        1000 * fallTime
+    ) 
+    .onUpdate( 
+        () => {
+            arrow.position.x += v.x;
+            arrow.position.y += v.y;
+            arrow.position.z += v.z;
+        })
+    .easing(TWEEN.Easing.Quadratic.Out)
+    .onComplete(
+        () => {
+            canShoot = true;
+            console.log("Arrow landed");
+        }
+    );
+
+    var arrowAngles = {x: arrow.rotation.x};
+
+    console.log( arrowAngles.x );
+    var arrowTweenAngle = new TWEEN.Tween(arrowAngles)
+    .to({x: -1.0 * arrowAngles.x}, 1000*time)
+    .easing(TWEEN.Easing.Quadratic.Out)
+    .onUpdate(
+        () => {
+            arrow.rotation.x = arrowAngles.x
+        }
+    );
+
+    arrowTween1 = arrowTween1.onComplete(
+        () => {
+            arrowTween2.start();
+        }
+    ).start();
+
+    arrowTweenAngle = arrowTweenAngle.start();
+}
+
 
 // ============================================================================
 // RENDERING FUNCTIONS
@@ -635,6 +817,8 @@ function render(time) {
     
     TWEEN.update();
     
+    // console.log(vec3ToArr(modelsMap.arrow.root.position));
+
     updateThirdPersonCamera();
     
     renderer.render(scene, thirdPersonCamera);

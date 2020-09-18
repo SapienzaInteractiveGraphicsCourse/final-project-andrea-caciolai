@@ -219,9 +219,6 @@ var AimPointerLockControls = function ( object, domElement ) {
             object.rotation.z += movementY * 0.002;
             object.rotation.x += movementY * 0.001;
             
-            console.log("\n\RIGHT: ");
-            console.log(object.rotation.z);
-            
             object.rotation.z = Math.min(
                 scope.maxPolarAngle, 
                 Math.max(
@@ -242,8 +239,6 @@ var AimPointerLockControls = function ( object, domElement ) {
                     scope.minPolarAngle
                 )
             );
-            console.log("\n\nLEFT: ");
-            console.log(object.rotation.z);
         }
 		scope.dispatchEvent( changeEvent );
 	}
@@ -331,4 +326,110 @@ var AimPointerLockControls = function ( object, domElement ) {
 AimPointerLockControls.prototype = Object.create( EventDispatcher.prototype );
 AimPointerLockControls.prototype.constructor = AimPointerLockControls;
 
-export { CustomPointerLockControls, AimPointerLockControls };
+var ShootPointerLockControls = function ( object, domElement ) {
+
+	if ( domElement === undefined ) {
+
+		console.warn( 'THREE.CustomPointerLockControls: The second parameter "domElement" is now mandatory.' );
+		domElement = document.body;
+
+	}
+
+	this.domElement = domElement;
+	this.isLocked = false;
+
+    //
+	// internals
+	//
+
+	var scope = this;
+
+	var changeEvent = { type: 'change' };
+	var lockEvent = { type: 'lock' };
+	var unlockEvent = { type: 'unlock' };
+
+	function onPointerlockChange() {
+
+		if ( scope.domElement.ownerDocument.pointerLockElement === scope.domElement ) {
+
+			scope.dispatchEvent( lockEvent );
+
+			scope.isLocked = true;
+
+		} else {
+
+			scope.dispatchEvent( unlockEvent );
+
+			scope.isLocked = false;
+
+		}
+
+	}
+
+	function onPointerlockError() {
+
+		console.error( 'THREE.CustomPointerLockControls: Unable to use Pointer Lock API' );
+
+	}
+
+	this.connect = function () {
+
+		scope.domElement.ownerDocument.addEventListener( 'mousemove', onMouseMove, false );
+		scope.domElement.ownerDocument.addEventListener( 'pointerlockchange', onPointerlockChange, false );
+		scope.domElement.ownerDocument.addEventListener( 'pointerlockerror', onPointerlockError, false );
+
+	};
+
+	this.disconnect = function () {
+
+		scope.domElement.ownerDocument.removeEventListener( 'mousemove', onMouseMove, false );
+		scope.domElement.ownerDocument.removeEventListener( 'pointerlockchange', onPointerlockChange, false );
+		scope.domElement.ownerDocument.removeEventListener( 'pointerlockerror', onPointerlockError, false );
+
+	};
+
+	this.dispose = function () {
+
+		this.disconnect();
+
+	};
+
+	this.getObject = function () { // retaining this method for backward compatibility
+
+		return object;
+
+	};
+
+	this.getDirection = function () {
+
+		var direction = new Vector3( 0, 0, - 1 );
+
+		return function ( v ) {
+
+			return v.copy( direction ).applyQuaternion( object.quaternion );
+
+		};
+
+	}();
+
+	this.lock = function () {
+
+		this.domElement.requestPointerLock();
+
+	};
+
+	this.unlock = function () {
+
+		scope.domElement.ownerDocument.exitPointerLock();
+
+	};
+
+	this.connect();
+
+};
+
+ShootPointerLockControls.prototype = Object.create( EventDispatcher.prototype );
+ShootPointerLockControls.prototype.constructor = ShootPointerLockControls;
+
+
+export { CustomPointerLockControls, AimPointerLockControls, ShootPointerLockControls};
