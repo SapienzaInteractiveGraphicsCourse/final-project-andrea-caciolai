@@ -7,16 +7,19 @@ import TWEEN from '../lib/tween.js/dist/tween.esm.js'
 
 import {SceneUtils} from '../lib/three.js/examples/jsm/utils/SceneUtils.js'
 import {SkeletonUtils} from '../lib/three.js/examples/jsm/utils/SkeletonUtils.js';
-import {dumpObject, degToRad, degToRad3, vec3ToArr} from './utils.js'
+import * as UTILS from './utils.js'
 
 // ============================================================================
 // GLOBAL VARIABLES AND PARAMETERS
 // ============================================================================
-
 var renderer;
 var textureLoader;
 var loadingManager;
+
+// Game state
 var gamePaused = true;
+
+
 
 // Objects variables
 var thirdPersonCamera;
@@ -30,7 +33,7 @@ var sceneBuilt = false;
 var controlsSet = false;
 
 var playerControls;
-
+var gameControls = [];
 
 // Camera parameters
 const fov = 45;
@@ -121,7 +124,6 @@ modelsMap = {
     }
 };
 
-
 loadModelsList = [modelsMap.link, modelsMap.target, modelsMap.arrow];
 
 // Controls parameters
@@ -141,11 +143,14 @@ const linkJumpSpeed = 200.0;
 const linkMass = 100.0;
 
 var prevTime = performance.now();
-var velocity = new THREE.Vector3();
-var direction = new THREE.Vector3();
+var linkVelocity = new THREE.Vector3();
+var linkDirection = new THREE.Vector3();
+
+var linkForwardTweens = [];
+var linkBackwardTweens = [];
 
 // Arrow movement variables and params
-
+var arrowTweens = [];
 var shootInitTime;
 var shootFinalTime;
 
@@ -225,54 +230,60 @@ function initLinkJoints() {
     const link = modelsMap.link;
 
     link.root.traverse(obj => {
-        // Upper left limbs
-        if (obj.isBone && obj.name === 'upper_armL') {
-            link.joints.upper.left.arm = obj;
-        }
-        if (obj.isBone && obj.name === 'forearmL') {
-            link.joints.upper.left.forearm = obj;
-        }
-        if (obj.isBone && obj.name === 'handL') {
-            link.joints.upper.left.hand = obj;
-        }
+
+        if ( obj.isBone ) {
+            // console.log(obj.name);
+            // console.log(obj.rotation);
     
-        // Upper right limbs
-        if (obj.isBone && obj.name === 'upper_armR') {
-            link.joints.upper.right.arm = obj;
-        }
-        if (obj.isBone && obj.name === 'forearmR') {
-            link.joints.upper.right.forearm = obj;
-        }
-        if (obj.isBone && obj.name === 'handR') {
-            link.joints.upper.right.hand = obj;
-        }
-    
-        // Lower left limbs
-        if (obj.isBone && obj.name === 'thighL') {
-            link.joints.lower.left.thigh = obj;
-        }
-        if (obj.isBone && obj.name === 'shinL') {
-            link.joints.lower.left.shin = obj;
-        }
-        if (obj.isBone && obj.name === 'footL') {
-            link.joints.lower.left.foot = obj;
-        }
-        if (obj.isBone && obj.name === 'toeL') {
-            link.joints.lower.left.toe = obj;
-        }
-    
-        // Lower right limbs
-        if (obj.isBone && obj.name === 'thighR') {
-            link.joints.lower.right.thigh = obj;
-        }
-        if (obj.isBone && obj.name === 'shinR') {
-            link.joints.lower.right.shin = obj;
-        }
-        if (obj.isBone && obj.name === 'footR') {
-            link.joints.lower.right.foot = obj;
-        }
-        if (obj.isBone && obj.name === 'toeR') {
-            link.joints.lower.right.toe = obj;
+            // Upper left limbs
+            if (obj.name === 'upper_armL') {
+                link.joints.upper.left.arm = obj;
+            }
+            if (obj.name === 'forearmL') {
+                link.joints.upper.left.forearm = obj;
+            }
+            if (obj.name === 'handL') {
+                link.joints.upper.left.hand = obj;
+            }
+        
+            // Upper right limbs
+            if (obj.name === 'upper_armR') {
+                link.joints.upper.right.arm = obj;
+            }
+            if (obj.name === 'forearmR') {
+                link.joints.upper.right.forearm = obj;
+            }
+            if (obj.name === 'handR') {
+                link.joints.upper.right.hand = obj;
+            }
+        
+            // Lower left limbs
+            if (obj.name === 'thighL') {
+                link.joints.lower.left.thigh = obj;
+            }
+            if (obj.name === 'shinL') {
+                link.joints.lower.left.shin = obj;
+            }
+            if (obj.name === 'footL') {
+                link.joints.lower.left.foot = obj;
+            }
+            if (obj.name === 'toeL') {
+                link.joints.lower.left.toe = obj;
+            }
+        
+            // Lower right limbs
+            if (obj.name === 'thighR') {
+                link.joints.lower.right.thigh = obj;
+            }
+            if (obj.name === 'shinR') {
+                link.joints.lower.right.shin = obj;
+            }
+            if (obj.name === 'footR') {
+                link.joints.lower.right.foot = obj;
+            }
+            if (obj.name === 'toeR') {
+                link.joints.lower.right.toe = obj;
+            }
         }
     });
 }
@@ -284,7 +295,7 @@ function buildLink() {
     
     link.root.position.set(...link.position);
     link.root.scale.multiplyScalar(link.scale);
-    const rotation = degToRad3(link.rotation);
+    const rotation = UTILS.degToRad3(link.rotation);
     link.root.rotation.set(...rotation);
 
     scene.add( link.root );
@@ -293,8 +304,7 @@ function buildLink() {
 
     initLinkJoints();
 
-    console.log(link.joints);
-    console.log(dumpObject(link.root));
+    console.log(UTILS.dumpObject(link.root));
 }
 
 function initBowJoints() {
@@ -314,18 +324,17 @@ function buildBow() {
     initBowJoints();
 }
 
-
 function buildTarget() {
     const target = modelsMap.target;
     target.root = target.gltf.scene.children[0];
     
     target.root.position.set(...target.position);
     target.root.scale.multiplyScalar(target.scale);
-    const rotation = degToRad3(target.rotation);
+    const rotation = UTILS.degToRad3(target.rotation);
     target.root.rotation.set(...rotation);
 
     scene.add( target.root );
-    console.log(dumpObject(target.root));
+    console.log(UTILS.dumpObject(target.root));
 }
 
 function buildArrow() {
@@ -340,10 +349,10 @@ function buildArrow() {
     bow.add( arrow.root );
     
     arrow.root.scale.multiplyScalar(arrow.scale);
-    const rotation = degToRad3(arrow.rotation);
+    const rotation = UTILS.degToRad3(arrow.rotation);
     arrow.root.rotation.set(...rotation);
     
-    console.log(dumpObject(arrow.root));
+    console.log(UTILS.dumpObject(arrow.root));
 }
 
 
@@ -445,38 +454,19 @@ function createGround() {
 // ============================================================================
 // HANDLING FUNCTIONS
 // ============================================================================
-
-
-function thirdPersonCameraControls() {
-    const link = modelsMap.link.root;
-    playerControls = new CustomPointerLockControls( link, document.body );
-    
-    playerControls.enableMouseVertical = false;
-
+function initGUI() {
     var instructions = document.getElementById( 'instructions' );
 
     blocker.style.display = 'block';
     instructions.style.display = '';
+}
 
-    instructions.addEventListener( 'click', function () {
+function thirdPersonCameraControls() {
 
-        playerControls.lock();
-
-    }, false );
-
-    playerControls.addEventListener( 'lock', function () {
-
-        instructions.style.display = 'none';
-        blocker.style.display = 'none';
-        gamePaused = false;
-    } );
-
-    playerControls.addEventListener( 'unlock', function () {
-
-        blocker.style.display = 'block';
-        instructions.style.display = '';
-        gamePaused = true;
-    } );
+    const link = modelsMap.link.root;
+    playerControls = new CustomPointerLockControls( link, document.body );
+    
+    playerControls.enableMouseVertical = false;
 
     // scene.add( controls.getObject() );
 
@@ -505,7 +495,7 @@ function thirdPersonCameraControls() {
                 break;
 
             case 32: // space
-                if ( canJump === true ) velocity.y += linkJumpSpeed;
+                if ( canJump === true ) linkVelocity.y += linkJumpSpeed;
                 canJump = false;
                 break;
 
@@ -543,14 +533,11 @@ function thirdPersonCameraControls() {
 
     document.addEventListener( 'keydown', onKeyDown, false );
     document.addEventListener( 'keyup', onKeyUp, false );
+
+    gameControls.push(playerControls);
 }
 
 function bowVerticalControls() {
-
-    var instructions = document.getElementById( 'instructions' );
-
-    blocker.style.display = 'block';
-    instructions.style.display = '';
 
     const link = modelsMap.link;
     const armL = link.joints.upper.left.arm;
@@ -568,25 +555,7 @@ function bowVerticalControls() {
         bowControls.minPolarAngle = 0.25 * Math.PI;
         bowControls.maxPolarAngle = 0.75 * Math.PI;
 
-        instructions.addEventListener( 'click', function () {
-
-            bowControls.lock();
-    
-        }, false );
-    
-        bowControls.addEventListener( 'lock', function () {
-    
-            instructions.style.display = 'none';
-            blocker.style.display = 'none';
-            gamePaused = false;
-        } );
-    
-        bowControls.addEventListener( 'unlock', function () {
-    
-            blocker.style.display = 'block';
-            instructions.style.display = '';
-            gamePaused = true;
-        } ); 
+        gameControls.push(bowControls);
     });
 }
 
@@ -622,51 +591,47 @@ function shootControls () {
     document.addEventListener('mouseup', onClickRelease, false);
 }
 
+function setListeners(controls) {
+    var instructions = document.getElementById( 'instructions' );
+
+    instructions.addEventListener( 'click', function () {
+
+        controls.lock();
+
+    }, false );
+
+    controls.addEventListener( 'lock', function () {
+
+        instructions.style.display = 'none';
+        blocker.style.display = 'none';
+        gamePaused = false;
+    } );
+
+    controls.addEventListener( 'unlock', function () {
+
+        blocker.style.display = 'block';
+        instructions.style.display = '';
+        gamePaused = true;
+    } );
+}
+
 function handleControls() {
+    initGUI();
     // orbitControls();
     thirdPersonCameraControls();
     bowVerticalControls();
     shootControls();
     
+    gameControls.forEach(
+        (controls) => {
+            setListeners(controls);
+        }
+    );
+
     controlsSet = true;
     main();
 }
  
-function updateThirdPersonCamera() {
-    var time = performance.now();
-    var dt = ( time - prevTime ) / 1000;
-
-    // Apply friction
-    velocity.x -= velocity.x * floorFriction * dt;
-    velocity.z -= velocity.z * floorFriction * dt;
-
-    // Update velocity based on current direction
-    direction.z = Number( moveForward ) - Number( moveBackward );
-    direction.x = Number( moveRight ) - Number( moveLeft );
-    direction.normalize(); // this ensures consistent movements in all directions
-
-    if ( moveForward || moveBackward ) velocity.z -= direction.z * linkMoveSpeed * dt;
-    if ( moveLeft || moveRight ) velocity.x -= direction.x * linkMoveSpeed * dt;
-
-    // Update position
-    playerControls.moveRight( velocity.x * dt );
-    playerControls.moveForward( velocity.z * dt );
-
-    // Update vertical position
-    playerControls.getObject().position.y += ( velocity.y * dt ); // new behavior
-
-    // Check vertical position (no infinite falling)
-    if ( playerControls.getObject().position.y < 0 ) {
-        velocity.y = 0;
-        playerControls.getObject().position.y = 0;
-        canJump = true;
-    } else {
-        velocity.y -= 9.8 * linkMass * dt; // 100.0 = mass
-    }
-
-    prevTime = time;
-}
-
 // ============================================================================
 // ANIMATION FUNCTIONS
 // ============================================================================
@@ -685,35 +650,11 @@ function computeArrowDirection() {
 function computeArrowInitialVelocity(direction) {
     var charge = (shootFinalTime - shootInitTime) * 0.001;
     var deltaT = Math.min(charge, maxCharge);
-    console.log(charge);
 
     var impulse = arrowForce * deltaT;
     var initialSpeed = impulse / arrowMass;
     var initialVelocity = direction.multiplyScalar(initialSpeed);
     return initialVelocity;
-}
-
-function computeArrowTrajectory(initialPosition, initialVelocity) {
-    var peak = new THREE.Vector3();
-    var final = new THREE.Vector3();
-
-    const y0 = initialPosition.y;
-    const vy0 = initialVelocity.y;
-    
-    // Compute time of flight
-    const t = (vy0 / g) * (1.0 + Math.sqrt( 1.0 + (2 * g * y0) / Math.pow(vy0, 2) ));
-
-    // Compute position at peak
-    peak.x = initialPosition.x + initialVelocity.x * (0.5 * t);
-    peak.y = y0 + vy0 * (0.5 * t) - ( 0.5 * g * Math.pow((0.5 * t), 2) );
-    peak.z = initialPosition.z + initialVelocity.z * (0.5 * t);
-
-    // Compute final position
-    final.x = initialPosition.x + initialVelocity.x * t;
-    final.y = 0.0;
-    final.z = initialPosition.z + initialVelocity.z * t;
-
-    return [t, peak, final];
 }
 
 function shootArrow() {
@@ -733,8 +674,8 @@ function shootArrow() {
     // Initial velocity
     var arrowInitialVelocity = computeArrowInitialVelocity(dir);
     
-    console.log("Initial position: " + vec3ToArr(arrowInitialPosition));
-    console.log("Initial velocity: " + vec3ToArr(arrowInitialVelocity));
+    console.log("Initial position: " + UTILS.vec3ToArr(arrowInitialPosition));
+    console.log("Initial velocity: " + UTILS.vec3ToArr(arrowInitialVelocity));
 
     var vy0 = arrowInitialVelocity.y;
     var y0 = arrowInitialPosition.y;
@@ -776,12 +717,12 @@ function shootArrow() {
         () => {
             canShoot = true;
             console.log("Arrow landed");
+            arrowTweens = [];
         }
     );
 
     var arrowAngles = {x: arrow.rotation.x};
 
-    console.log( arrowAngles.x );
     var arrowTweenAngle = new TWEEN.Tween(arrowAngles)
     .to({x: -1.0 * arrowAngles.x}, 1000*time)
     .easing(TWEEN.Easing.Quadratic.Out)
@@ -793,13 +734,211 @@ function shootArrow() {
 
     arrowTween1 = arrowTween1.onComplete(
         () => {
+            arrowTweens.push(arrowTween2);
             arrowTween2.start();
         }
-    ).start();
+    );
+    
+    arrowTweens.push(arrowTween1);
+    arrowTweens.push(arrowTweenAngle);
 
-    arrowTweenAngle = arrowTweenAngle.start();
+    UTILS.startTweens(arrowTweens);
 }
 
+function controlLinkMovement() {
+    var time = performance.now();
+    var dt = ( time - prevTime ) / 1000;
+
+    // Apply friction
+    linkVelocity.x -= linkVelocity.x * floorFriction * dt;
+    linkVelocity.z -= linkVelocity.z * floorFriction * dt;
+
+    // Update velocity based on current direction
+    linkDirection.z = Number( moveForward ) - Number( moveBackward );
+    linkDirection.x = Number( moveRight ) - Number( moveLeft );
+    linkDirection.normalize(); // this ensures consistent movements in all directions
+
+    if ( moveForward || moveBackward ) linkVelocity.z -= linkDirection.z * linkMoveSpeed * dt;
+    if ( moveLeft || moveRight ) linkVelocity.x -= linkDirection.x * linkMoveSpeed * dt;
+
+    // Update position
+    playerControls.moveRight( linkVelocity.x * dt );
+    playerControls.moveForward( linkVelocity.z * dt );
+
+    const eps = 0.001;
+
+    if ( linkVelocity.z < -eps ) {
+        startLinkWalkForward();
+        stopLinkWalkBackward();
+    }
+    if ( Math.abs(linkVelocity.z) < eps ) {
+        stopLinkWalkForward();
+        stopLinkWalkBackward();
+    }
+    if ( linkVelocity.z > eps ) {
+        stopLinkWalkForward();
+        startLinkWalkBackward();
+    }
+
+    // Update vertical position
+    playerControls.getObject().position.y += ( linkVelocity.y * dt ); // new behavior
+
+    // Check vertical position (no infinite falling)
+    if ( playerControls.getObject().position.y < 0 ) {
+        linkVelocity.y = 0;
+        playerControls.getObject().position.y = 0;
+        canJump = true;
+    } else {
+        linkVelocity.y -= 9.8 * linkMass * dt; // 100.0 = mass
+    }
+
+    prevTime = time;
+}
+
+function initLinkLowerLimbs() {
+    const linkJoints = modelsMap.link.joints;
+
+    // Set initial position for lower limbs
+    linkJoints.lower.left.thigh.rotation.x = UTILS.degToRad(180);
+    linkJoints.lower.left.shin.rotation.x = 0.0;
+    linkJoints.lower.left.foot.rotation.x = 0.0;
+    linkJoints.lower.left.toe.rotation.x = 0.0;
+
+    
+    linkJoints.lower.right.thigh.rotation.x = UTILS.degToRad(180);
+    linkJoints.lower.right.shin.rotation.x = 0.0;
+    linkJoints.lower.right.foot.rotation.x = 0.0;
+    linkJoints.lower.right.toe.rotation.x = 0.0;
+}
+
+function startLinkWalkForward() {
+    const linkJoints = modelsMap.link.joints;
+
+    // Set initial position for lower limbs
+    if ( linkForwardTweens.length != 0 ) return;
+    
+    console.log(linkForwardTweens.length);
+    initLinkLowerLimbs();
+
+    // Params
+    const time1 = 200;
+    const time2 = 400;
+    const time3 = 200;
+    
+    const thighAngle1 = 30;
+    const shinLAngle1 = 0;
+    const shingRAngle1 = -30;
+    
+    const thighAngle2 = -30;
+    const shinLAngle2 = 30;
+    const shinRAngle2 = 0;
+    
+    const thighAngle3 = 0;
+    const shinLAngle3 = 0;
+    const shinRAngle3 = 0;
+
+    // Thigh tweens
+    var thigh = {angle: 0.0};
+    var thighTween1 = new TWEEN.Tween(thigh)
+	.to({ angle: thighAngle1}, time1) 
+	.easing(TWEEN.Easing.Quadratic.In)
+	.onUpdate( 
+            () => {
+                linkJoints.lower.left.thigh.rotation.x = UTILS.degToRad(180 +  thigh.angle ); // forward
+                linkJoints.lower.right.thigh.rotation.x = UTILS.degToRad(180 - 1.0 * thigh.angle ); // backward
+            }
+    );
+
+    var thighTween2 = new TWEEN.Tween(thigh)
+	.to({ angle: thighAngle2}, time2) 
+	.easing(TWEEN.Easing.Quadratic.In)
+	.onUpdate( 
+            () => {
+                linkJoints.lower.left.thigh.rotation.x = UTILS.degToRad(180 +  thigh.angle ); // forward
+                linkJoints.lower.right.thigh.rotation.x = UTILS.degToRad(180 -1.0 * thigh.angle ); // backward
+            }
+    );
+
+    var thighTween3 = new TWEEN.Tween(thigh)
+	.to({ angle: thighAngle3}, time3) 
+	.easing(TWEEN.Easing.Quadratic.In)
+	.onUpdate( 
+            () => {
+                linkJoints.lower.left.thigh.rotation.x = UTILS.degToRad(180 +  thigh.angle ); // forward
+                linkJoints.lower.right.thigh.rotation.x = UTILS.degToRad(180 -1.0 * thigh.angle ); // backward
+            }
+    );
+        
+
+    // Shin tweens
+    var shin = {angleL: 0.0, angleR: 0.0};
+    var shinTween1 = new TWEEN.Tween(shin)
+	.to({ angleL: shinLAngle1, angleR: shingRAngle1 }, time1) 
+	.easing(TWEEN.Easing.Quadratic.Out)
+	.onUpdate( 
+            () => {
+                linkJoints.lower.left.shin.rotation.x = UTILS.degToRad( shin.angleL ); // forward
+                linkJoints.lower.right.shin.rotation.x = UTILS.degToRad( shin.angleR ); // backward
+            }
+	);
+    
+    var shinTween2 = new TWEEN.Tween(shin)
+	.to({ angleL: shinLAngle2, angleR: shinRAngle2 }, time2) 
+	.easing(TWEEN.Easing.Quadratic.Out)
+	.onUpdate( 
+            () => {
+                linkJoints.lower.left.shin.rotation.x = UTILS.degToRad( shin.angleL ); // forward
+                linkJoints.lower.right.shin.rotation.x = UTILS.degToRad( shin.angleR ); // backward
+            }
+	);
+    
+    var shinTween3 = new TWEEN.Tween(shin)
+	.to({ angleL: shinLAngle3, angleR: shinRAngle3 }, time3) 
+	.easing(TWEEN.Easing.Quadratic.Out)
+	.onUpdate( 
+            () => {
+                linkJoints.lower.left.shin.rotation.x = UTILS.degToRad( shin.angleL ); // forward
+                linkJoints.lower.right.shin.rotation.x = UTILS.degToRad( shin.angleR ); // backward
+            }
+	);
+
+    // Add tweens to list
+    linkForwardTweens.push(thighTween1);
+    linkForwardTweens.push(shinTween1);
+
+    linkForwardTweens.push(thighTween2);
+    linkForwardTweens.push(shinTween2);
+    
+    linkForwardTweens.push(thighTween3);
+    linkForwardTweens.push(shinTween3);
+
+    // Start tweens in a cyclic fashion
+    thighTween1.onComplete( () => { thighTween2.start(); } );
+    shinTween1.onComplete( () => { shinTween2.start(); } );
+    
+    thighTween2.onComplete( () => { thighTween3.start(); } );
+    shinTween2.onComplete( () => { shinTween3.start(); } );
+    
+    thighTween3.onComplete( () => { thighTween1.start(); } );
+    shinTween3.onComplete( () => { shinTween1.start(); } );
+
+    thighTween1.start();
+    shinTween1.start();
+}
+
+function stopLinkWalkForward() {
+    UTILS.stopTweens(linkForwardTweens);
+    linkForwardTweens = [];
+    initLinkLowerLimbs();
+}
+
+function startLinkWalkBackward() {
+
+}
+
+function stopLinkWalkBackward() {
+
+}
 
 // ============================================================================
 // RENDERING FUNCTIONS
@@ -817,9 +956,7 @@ function render(time) {
     
     TWEEN.update();
     
-    // console.log(vec3ToArr(modelsMap.arrow.root.position));
-
-    updateThirdPersonCamera();
+    controlLinkMovement();
     
     renderer.render(scene, thirdPersonCamera);
     requestAnimationFrame(render);

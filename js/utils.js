@@ -36,7 +36,13 @@ export function ArrToVec3(arr) {
     return new THREE.Vector3(arr[0], arr[1], arr[2]);
 }
 
-
+export function startTweens(tweens) {
+    tweens.forEach(
+        (tween) => {
+            tween.start();
+        }
+    );
+}
 
 export function pauseTweens(tweens) {
 	tweens.forEach( 
@@ -52,4 +58,17 @@ export function resumeTweens(tweens) {
 			tween.resume();
 		} 
 	);	
+}
+
+export function stopTweens(tweens) {
+    tweens.forEach(
+        (tween) => {
+            tween.stop();
+        }
+    );
+}
+
+export function removeFromArray(array, obj) {
+    var filtered = array.filter(function(el) { return el !== obj; }); 
+    return filtered;
 }
