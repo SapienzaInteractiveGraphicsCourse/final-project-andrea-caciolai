@@ -148,6 +148,7 @@ var linkDirection = new THREE.Vector3();
 
 var linkForwardTweens = [];
 var linkBackwardTweens = [];
+var linkSideTweens = [];
 
 // Arrow movement variables and params
 var arrowTweens = [];
@@ -745,6 +746,36 @@ function shootArrow() {
     UTILS.startTweens(arrowTweens);
 }
 
+function initLinkLowerLimbsX() {
+    const linkJoints = modelsMap.link.joints;
+
+    // Set initial position for lower limbs
+    linkJoints.lower.left.thigh.rotation.x = UTILS.degToRad(180);
+    linkJoints.lower.left.shin.rotation.x = 0.0;
+    linkJoints.lower.left.foot.rotation.x = 0.0;
+    linkJoints.lower.left.toe.rotation.x = 0.0;
+    
+    linkJoints.lower.right.thigh.rotation.x = UTILS.degToRad(180);
+    linkJoints.lower.right.shin.rotation.x = 0.0;
+    linkJoints.lower.right.foot.rotation.x = 0.0;
+    linkJoints.lower.right.toe.rotation.x = 0.0;
+}
+
+function initLinkLowerLimbsZ() {
+    const linkJoints = modelsMap.link.joints;
+
+    // Set initial position for lower limbs
+    linkJoints.lower.left.thigh.rotation.z = 0.0;
+    linkJoints.lower.left.shin.rotation.z = 0.0;
+    linkJoints.lower.left.foot.rotation.z = 0.0;
+    linkJoints.lower.left.toe.rotation.z = 0.0;
+
+    linkJoints.lower.right.thigh.rotation.z = 0.0;
+    linkJoints.lower.right.shin.rotation.z = 0.0;
+    linkJoints.lower.right.foot.rotation.z = 0.0;
+    linkJoints.lower.right.toe.rotation.z = 0.0;
+}
+
 function controlLinkMovement() {
     var time = performance.now();
     var dt = ( time - prevTime ) / 1000;
@@ -767,6 +798,7 @@ function controlLinkMovement() {
 
     const eps = 0.001;
 
+    // z-axis animation
     if ( linkVelocity.z < -eps ) {
         startLinkWalkForward();
         stopLinkWalkBackward();
@@ -774,11 +806,23 @@ function controlLinkMovement() {
     if ( Math.abs(linkVelocity.z) < eps ) {
         stopLinkWalkForward();
         stopLinkWalkBackward();
-        initLinkLowerLimbs();
+        initLinkLowerLimbsX();
     }
     if ( linkVelocity.z > eps ) {
         stopLinkWalkForward();
         startLinkWalkBackward();
+    }
+
+    // x-axis animation
+    if ( linkVelocity.x < -eps ) {
+        startLinkWalkSideways();
+    }
+    if ( Math.abs(linkVelocity.x) < eps ) {
+        stopLinkWalkSideways();
+        initLinkLowerLimbsZ();
+    }
+    if ( linkVelocity.x > eps ) {
+        startLinkWalkSideways();
     }
 
     // Update vertical position
@@ -796,29 +840,13 @@ function controlLinkMovement() {
     prevTime = time;
 }
 
-function initLinkLowerLimbs() {
-    const linkJoints = modelsMap.link.joints;
-
-    // Set initial position for lower limbs
-    linkJoints.lower.left.thigh.rotation.x = UTILS.degToRad(180);
-    linkJoints.lower.left.shin.rotation.x = 0.0;
-    linkJoints.lower.left.foot.rotation.x = 0.0;
-    linkJoints.lower.left.toe.rotation.x = 0.0;
-
-    
-    linkJoints.lower.right.thigh.rotation.x = UTILS.degToRad(180);
-    linkJoints.lower.right.shin.rotation.x = 0.0;
-    linkJoints.lower.right.foot.rotation.x = 0.0;
-    linkJoints.lower.right.toe.rotation.x = 0.0;
-}
-
 function startLinkWalkForward() {
     const linkJoints = modelsMap.link.joints;
 
     // Set initial position for lower limbs
     if ( linkForwardTweens.length != 0 ) return;
     
-    initLinkLowerLimbs();
+    initLinkLowerLimbsX();
 
     // Params
     const time1 = 200;
@@ -937,7 +965,7 @@ function startLinkWalkBackward() {
     // Set initial position for lower limbs
     if ( linkBackwardTweens.length != 0 ) return;
     
-    initLinkLowerLimbs();
+    initLinkLowerLimbsX();
 
     // Params
     const time1 = 200;
@@ -1048,6 +1076,59 @@ function startLinkWalkBackward() {
 function stopLinkWalkBackward() {
     UTILS.stopTweens(linkBackwardTweens);
     linkBackwardTweens = [];
+}
+
+function startLinkWalkSideways() {
+    const linkJoints = modelsMap.link.joints;
+
+    // Set initial position for lower limbs
+    if ( linkSideTweens.length != 0 ) return;
+    
+    initLinkLowerLimbsX();
+
+    // Params
+    const time1 = 200;
+    const time2 = 400;
+    
+    const thighAngle1 = -15;
+    const thighAngle2 = 0;
+
+    // Thigh tweens
+    var thigh = {angle: 0.0};
+    var thighTween1 = new TWEEN.Tween(thigh)
+	.to({ angle: thighAngle1}, time1) 
+	.easing(TWEEN.Easing.Quadratic.In)
+	.onUpdate( 
+            () => {
+                linkJoints.lower.left.thigh.rotation.z = UTILS.degToRad( thigh.angle ); // forward
+                linkJoints.lower.right.thigh.rotation.z = UTILS.degToRad( -thigh.angle ); // backward
+            }
+    );
+
+    var thighTween2 = new TWEEN.Tween(thigh)
+	.to({ angle: thighAngle2}, time2) 
+	.easing(TWEEN.Easing.Quadratic.In)
+	.onUpdate( 
+            () => {
+                linkJoints.lower.left.thigh.rotation.z = UTILS.degToRad( thigh.angle ); // forward
+                linkJoints.lower.right.thigh.rotation.z = UTILS.degToRad( -thigh.angle ); // backward
+            }
+    );
+
+    // Add tweens to list
+    linkSideTweens.push(thighTween1);
+    linkSideTweens.push(thighTween2);
+
+    // Start tweens in a cyclic fashion
+    thighTween1.onComplete( () => { thighTween2.start(); } );
+    thighTween2.onComplete( () => { thighTween1.start(); } );
+
+    thighTween1.start();
+}
+
+function stopLinkWalkSideways() {
+    UTILS.stopTweens(linkSideTweens);
+    linkSideTweens = [];
 }
 
 // ============================================================================
