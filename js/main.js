@@ -774,6 +774,7 @@ function controlLinkMovement() {
     if ( Math.abs(linkVelocity.z) < eps ) {
         stopLinkWalkForward();
         stopLinkWalkBackward();
+        initLinkLowerLimbs();
     }
     if ( linkVelocity.z > eps ) {
         stopLinkWalkForward();
@@ -817,7 +818,6 @@ function startLinkWalkForward() {
     // Set initial position for lower limbs
     if ( linkForwardTweens.length != 0 ) return;
     
-    console.log(linkForwardTweens.length);
     initLinkLowerLimbs();
 
     // Params
@@ -929,15 +929,125 @@ function startLinkWalkForward() {
 function stopLinkWalkForward() {
     UTILS.stopTweens(linkForwardTweens);
     linkForwardTweens = [];
-    initLinkLowerLimbs();
 }
 
 function startLinkWalkBackward() {
+    const linkJoints = modelsMap.link.joints;
 
+    // Set initial position for lower limbs
+    if ( linkBackwardTweens.length != 0 ) return;
+    
+    initLinkLowerLimbs();
+
+    // Params
+    const time1 = 200;
+    const time2 = 400;
+    const time3 = 200;
+    
+    const thighAngle1 = -30;
+    const shinLAngle1 = 0;
+    const shingRAngle1 = 30;
+    
+    const thighAngle2 = 30;
+    const shinLAngle2 = -30;
+    const shinRAngle2 = 0;
+    
+    const thighAngle3 = 0;
+    const shinLAngle3 = 0;
+    const shinRAngle3 = 0;
+
+    // Thigh tweens
+    var thigh = {angle: 0.0};
+    var thighTween1 = new TWEEN.Tween(thigh)
+	.to({ angle: thighAngle1}, time1) 
+	.easing(TWEEN.Easing.Quadratic.In)
+	.onUpdate( 
+            () => {
+                linkJoints.lower.left.thigh.rotation.x = UTILS.degToRad(180 +  thigh.angle ); // forward
+                linkJoints.lower.right.thigh.rotation.x = UTILS.degToRad(180 - 1.0 * thigh.angle ); // backward
+            }
+    );
+
+    var thighTween2 = new TWEEN.Tween(thigh)
+	.to({ angle: thighAngle2}, time2) 
+	.easing(TWEEN.Easing.Quadratic.In)
+	.onUpdate( 
+            () => {
+                linkJoints.lower.left.thigh.rotation.x = UTILS.degToRad(180 +  thigh.angle ); // forward
+                linkJoints.lower.right.thigh.rotation.x = UTILS.degToRad(180 -1.0 * thigh.angle ); // backward
+            }
+    );
+
+    var thighTween3 = new TWEEN.Tween(thigh)
+	.to({ angle: thighAngle3}, time3) 
+	.easing(TWEEN.Easing.Quadratic.In)
+	.onUpdate( 
+            () => {
+                linkJoints.lower.left.thigh.rotation.x = UTILS.degToRad(180 +  thigh.angle ); // forward
+                linkJoints.lower.right.thigh.rotation.x = UTILS.degToRad(180 -1.0 * thigh.angle ); // backward
+            }
+    );
+        
+
+    // Shin tweens
+    var shin = {angleL: 0.0, angleR: 0.0};
+    var shinTween1 = new TWEEN.Tween(shin)
+	.to({ angleL: shinLAngle1, angleR: shingRAngle1 }, time1) 
+	.easing(TWEEN.Easing.Quadratic.Out)
+	.onUpdate( 
+            () => {
+                linkJoints.lower.left.shin.rotation.x = UTILS.degToRad( shin.angleL ); // forward
+                linkJoints.lower.right.shin.rotation.x = UTILS.degToRad( shin.angleR ); // backward
+            }
+	);
+    
+    var shinTween2 = new TWEEN.Tween(shin)
+	.to({ angleL: shinLAngle2, angleR: shinRAngle2 }, time2) 
+	.easing(TWEEN.Easing.Quadratic.Out)
+	.onUpdate( 
+            () => {
+                linkJoints.lower.left.shin.rotation.x = UTILS.degToRad( shin.angleL ); // forward
+                linkJoints.lower.right.shin.rotation.x = UTILS.degToRad( shin.angleR ); // backward
+            }
+	);
+    
+    var shinTween3 = new TWEEN.Tween(shin)
+	.to({ angleL: shinLAngle3, angleR: shinRAngle3 }, time3) 
+	.easing(TWEEN.Easing.Quadratic.Out)
+	.onUpdate( 
+            () => {
+                linkJoints.lower.left.shin.rotation.x = UTILS.degToRad( shin.angleL ); // forward
+                linkJoints.lower.right.shin.rotation.x = UTILS.degToRad( shin.angleR ); // backward
+            }
+	);
+
+    // Add tweens to list
+    linkBackwardTweens.push(thighTween1);
+    linkBackwardTweens.push(shinTween1);
+
+    linkBackwardTweens.push(thighTween2);
+    linkBackwardTweens.push(shinTween2);
+    
+    linkBackwardTweens.push(thighTween3);
+    linkBackwardTweens.push(shinTween3);
+
+    // Start tweens in a cyclic fashion
+    thighTween1.onComplete( () => { thighTween2.start(); } );
+    shinTween1.onComplete( () => { shinTween2.start(); } );
+    
+    thighTween2.onComplete( () => { thighTween3.start(); } );
+    shinTween2.onComplete( () => { shinTween3.start(); } );
+    
+    thighTween3.onComplete( () => { thighTween1.start(); } );
+    shinTween3.onComplete( () => { shinTween1.start(); } );
+
+    thighTween1.start();
+    shinTween1.start();
 }
 
 function stopLinkWalkBackward() {
-
+    UTILS.stopTweens(linkBackwardTweens);
+    linkBackwardTweens = [];
 }
 
 // ============================================================================
