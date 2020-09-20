@@ -8,7 +8,7 @@ var MovementPointerLockControls = function ( object, domElement ) {
 
 	if ( domElement === undefined ) {
 
-		console.warn( 'THREE.CustomPointerLockControls: The second parameter "domElement" is now mandatory.' );
+		console.warn( 'THREE.MovementPointerLockControls: The second parameter "domElement" is now mandatory.' );
 		domElement = document.body;
 
 	}
@@ -96,7 +96,7 @@ var MovementPointerLockControls = function ( object, domElement ) {
 
 	function onPointerlockError() {
 
-		console.error( 'THREE.CustomPointerLockControls: Unable to use Pointer Lock API' );
+		console.error( 'THREE.MovementPointerLockControls: Unable to use Pointer Lock API' );
 
 	}
 
@@ -184,7 +184,7 @@ var AimPointerLockControls = function ( object, domElement ) {
 
 	if ( domElement === undefined ) {
 
-		console.warn( 'THREE.CustomPointerLockControls: The second parameter "domElement" is now mandatory.' );
+		console.warn( 'THREE.AimPointerLockControls: The second parameter "domElement" is now mandatory.' );
 		domElement = document.body;
 
 	}
@@ -263,7 +263,7 @@ var AimPointerLockControls = function ( object, domElement ) {
 
 	function onPointerlockError() {
 
-		console.error( 'THREE.CustomPointerLockControls: Unable to use Pointer Lock API' );
+		console.error( 'THREE.AimPointerLockControls: Unable to use Pointer Lock API' );
 
 	}
 
@@ -392,7 +392,7 @@ var HeadPointerLockControls = function ( object, domElement ) {
 
 	function onPointerlockError() {
 
-		console.error( 'THREE.CustomPointerLockControls: Unable to use Pointer Lock API' );
+		console.error( 'THREE.HeadPointerLockControls: Unable to use Pointer Lock API' );
 
 	}
 
