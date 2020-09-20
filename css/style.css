@@ -95,3 +95,19 @@ html, body {
 
     cursor: pointer;
 }
+
+#crosshair {
+    margin: 0;
+    position: absolute;
+    top: 55%;
+    left: 50%;
+    -ms-transform: translate(-55%, -60%);
+    transform: translate(-55%, -60%);
+}
+
+#crosshair-img {
+    height: auto; 
+    width: auto; 
+    max-width: 100px; 
+    max-height: 100px;
+}

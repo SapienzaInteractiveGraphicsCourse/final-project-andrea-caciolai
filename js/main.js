@@ -2,7 +2,7 @@ import * as THREE from '../lib/three.js/build/three.module.js'
 import {GLTFLoader} from '../lib/three.js/examples/jsm/loaders/GLTFLoader.js'
 import { OrbitControls } from '../lib/three.js/examples/jsm/controls/OrbitControls.js';
 // import { PointerLockControls } from '../lib/three.js/examples/jsm/controls/PointerLockControls.js';
-import { CustomPointerLockControls, AimPointerLockControls } from './controls.js';
+import { MovementPointerLockControls, AimPointerLockControls, HeadPointerLockControls } from './controls.js';
 import TWEEN from '../lib/tween.js/dist/tween.esm.js'
 
 import {SceneUtils} from '../lib/three.js/examples/jsm/utils/SceneUtils.js'
@@ -19,15 +19,6 @@ var loadingManager;
 // Game state
 var gamePaused = true;
 
-
-
-// Objects variables
-var thirdPersonCamera;
-var arrowCamera;
-var scene;
-var light;
-var ambient;
-
 var modelsLoaded = false;
 var sceneBuilt = false;
 var controlsSet = false;
@@ -35,34 +26,15 @@ var controlsSet = false;
 var playerControls;
 var gameControls = [];
 
-// Camera parameters
-const fov = 45;
-const aspect = window.innerWidth / window.innerHeight;  // the canvas default
-const near = 0.1;
-const far = 100000;
+// Objects variables
+var scene;
+var light;
+var ambient;
 
-// const cameraPosition = [ 1, 1, 0.0 ];
-// const cameraDistance = 100;
-
-var cameraPosition = [ 0, 3, -5 ];
-
-const fogNear = 50;
-const fogFar = 1000;
-const fogColor = 0xcce0ff;
-
-// Light parameters
-const lightDistance = 200;
-const lightPosition = [ 0, 1, 2 ];
-const lightTarget = [ 0, 0, 0 ];
-const lightColor = 0xFFFFFFFF;
-const lightIntensity = 5;
-
-const SHADOW_MAP_WIDTH = 2048; 
-const SHADOW_MAP_HEIGHT = 2048;
-
-const shadowCameraWidth = 100;
-const shadowCameraHeight = 100;
-const shadowCameraDepth = 1000;
+var currentCamera;
+var firstPersonCamera;
+var thirdPersonCamera;
+var arrowCamera;
 
 // Model variables
 var modelsMap;
@@ -86,7 +58,8 @@ modelsMap = {
                     arm: null,
                     forearm: null,
                     hand: null,
-                }
+                },
+                head: null
             },
             lower: {
                 left: {
@@ -126,6 +99,36 @@ modelsMap = {
 
 loadModelsList = [modelsMap.link, modelsMap.target, modelsMap.arrow];
 
+// Camera parameters
+const fov = 45;
+const aspect = window.innerWidth / window.innerHeight;  // the canvas default
+const near = 0.1;
+const far = 100000;
+
+const firstPersonCameraPosition = [ 2.0, 3.0, -10.0 ];
+const firstPersonCameraTarget = [ 2.0, 3.0, 1.0 ];
+
+const thirdPersonCameraPosition = [ modelsMap.link.position[0], modelsMap.link.position[1] + 3, modelsMap.link.position[2] - 5 ];
+const thirdPersonCameraTarget = [ modelsMap.link.position[0], modelsMap.link.position[1] + 2 , modelsMap.link.position[2] ];
+
+const fogNear = 50;
+const fogFar = 1000;
+const fogColor = 0xcce0ff;
+
+// Light parameters
+const lightDistance = 200;
+const lightPosition = [ 0, 1, 2 ];
+const lightTarget = [ 0, 0, 0 ];
+const lightColor = 0xFFFFFFFF;
+const lightIntensity = 5;
+
+const SHADOW_MAP_WIDTH = 2048; 
+const SHADOW_MAP_HEIGHT = 2048;
+
+const shadowCameraWidth = 100;
+const shadowCameraHeight = 100;
+const shadowCameraDepth = 1000;
+
 // Controls parameters
 var moveForward = false;
 var moveBackward = false;
@@ -164,6 +167,7 @@ const g = 9.81;
 // ============================================================================
 // INITIALIZATION FUNCTIONS
 // ============================================================================
+
 function loadAssets() {
     textureLoader = new THREE.TextureLoader();
     loadingManager = new THREE.LoadingManager();
@@ -235,7 +239,11 @@ function initLinkJoints() {
         if ( obj.isBone ) {
             // console.log(obj.name);
             // console.log(obj.rotation);
-    
+            
+            if (obj.name === 'spine006') {
+                link.joints.upper.head = obj;
+            }
+
             // Upper left limbs
             if (obj.name === 'upper_armL') {
                 link.joints.upper.left.arm = obj;
@@ -371,10 +379,12 @@ function buildScene() {
     createGround();  
     buildModels();
 
+    createFirstPersonCamera();
     createThirdPersonCamera();
     createArrowCamera();
 
     sceneBuilt = true;
+    currentCamera = thirdPersonCamera;
     main();
 }
 
@@ -382,15 +392,22 @@ function createFog() {
     scene.fog = new THREE.Fog( fogColor, fogNear, fogFar );
 }
 
-// Third person camera
+function createFirstPersonCamera() {
+    firstPersonCamera = new THREE.PerspectiveCamera(fov, aspect, near, far);    
+    const bow = modelsMap.link.root.getObjectByName('Bow');
+
+    firstPersonCamera.position.set( ...firstPersonCameraPosition );
+    firstPersonCamera.lookAt( ...firstPersonCameraTarget );
+    
+    bow.add( firstPersonCamera );
+}
+
 function createThirdPersonCamera() {
     thirdPersonCamera = new THREE.PerspectiveCamera(fov, aspect, near, far);    
     const link = modelsMap.link.root;
 
-    thirdPersonCamera.position.set( ...cameraPosition );
-    var target = [link.position.x, link.position.y, link.position.z];
-    target[1] += 2;
-    thirdPersonCamera.lookAt( ...target );
+    thirdPersonCamera.position.set( ...thirdPersonCameraPosition );
+    thirdPersonCamera.lookAt( ...thirdPersonCameraTarget );
     
     link.add( thirdPersonCamera );
 }
@@ -451,25 +468,50 @@ function createGround() {
     scene.add( mesh );
 }
 
-
 // ============================================================================
 // HANDLING FUNCTIONS
 // ============================================================================
+
 function initGUI() {
     var instructions = document.getElementById( 'instructions' );
 
     blocker.style.display = 'block';
     instructions.style.display = '';
+
+    var crosshair = document.getElementById( 'crosshair' );
+    crosshair.style.display = 'none';
 }
 
-function thirdPersonCameraControls() {
+function switchCamera() {
+    if ( currentCamera === firstPersonCamera ) {
+        currentCamera = thirdPersonCamera;
+        var crosshair = document.getElementById( 'crosshair' );
+        crosshair.style.display = 'none';
+    } else {
+        currentCamera = firstPersonCamera;
+        var crosshair = document.getElementById( 'crosshair' );
+        crosshair.style.display = '';
+    }
+}
+
+function setCameraControls() {
+    var onKeyDown = function( event ) {
+        switch (  event.keyCode ) {
+            case 81: // q
+                switchCamera();
+                break;
+        }
+    }
+    
+    document.addEventListener( 'keydown', onKeyDown, false );
+}
+
+function setPlayerControls() {
 
     const link = modelsMap.link.root;
-    playerControls = new CustomPointerLockControls( link, document.body );
+    playerControls = new MovementPointerLockControls( link, document.body );
     
     playerControls.enableMouseVertical = false;
-
-    // scene.add( controls.getObject() );
 
     var onKeyDown = function ( event ) {
 
@@ -499,9 +541,7 @@ function thirdPersonCameraControls() {
                 if ( canJump === true ) linkVelocity.y += linkJumpSpeed;
                 canJump = false;
                 break;
-
         }
-
     };
 
     var onKeyUp = function ( event ) {
@@ -538,16 +578,20 @@ function thirdPersonCameraControls() {
     gameControls.push(playerControls);
 }
 
-function bowVerticalControls() {
+function setBowControls() {
 
     const link = modelsMap.link;
     const armL = link.joints.upper.left.arm;
     const armR = link.joints.upper.right.arm;
+    const head = link.joints.upper.head;
 
     // Controls for left and right arm (and bow)
     var bowControlsL = new AimPointerLockControls( armL, document.body );
     var bowControlsR = new AimPointerLockControls( armR, document.body );
     bowControlsR.inverted = true;
+    
+    // Controls for link's head
+    var headControls = new HeadPointerLockControls( head, document.body, )
     
     var bowControlsArray = [bowControlsL, bowControlsR];
 
@@ -558,17 +602,23 @@ function bowVerticalControls() {
 
         gameControls.push(bowControls);
     });
+
+    headControls.minPolarAngle = -0.25 * Math.PI;
+    headControls.maxPolarAngle = 0.25 * Math.PI;
+    gameControls.push(headControls);
 }
 
-function orbitControls() {
-    var orbit = new OrbitControls( thirdPersonCamera, renderer.domElement );
-    orbit.minPolarAngle = 0.0;
-    orbit.maxPolarAngle = Math.PI * 0.5 - 0.1;
-    orbit.target.set(0, 0, 0);
-    orbit.update();
+function setOrbitControls() {
+    var orbitControls = new OrbitControls( thirdPersonCamera, renderer.domElement );
+    orbitControls.minPolarAngle = 0.0;
+    orbitControls.maxPolarAngle = Math.PI * 0.5 - 0.1;
+    orbitControls.target.set(0, 0, 0);
+    orbitControls.update();
+
+    gameControls.push(orbitControls);
 }
 
-function shootControls () {
+function setShootControls () {
     var onClickPressed = function (event) {
         if (gamePaused) return;
         if (!canShoot) return;
@@ -616,13 +666,15 @@ function setListeners(controls) {
     } );
 }
 
-function handleControls() {
+function setControls() {
     initGUI();
-    // orbitControls();
-    thirdPersonCameraControls();
-    bowVerticalControls();
-    shootControls();
     
+    // setOrbitControls();
+    setPlayerControls();
+    setBowControls();
+    setShootControls();
+    setCameraControls();
+
     gameControls.forEach(
         (controls) => {
             setListeners(controls);
@@ -631,6 +683,12 @@ function handleControls() {
 
     controlsSet = true;
     main();
+}
+
+function onWindowResize() {
+    thirdPersonCamera.aspect = window.innerWidth / window.innerHeight;
+    thirdPersonCamera.updateProjectionMatrix();
+    renderer.setSize( window.innerWidth, window.innerHeight );
 }
  
 // ============================================================================
@@ -678,40 +736,46 @@ function shootArrow() {
     console.log("Initial position: " + UTILS.vec3ToArr(arrowInitialPosition));
     console.log("Initial velocity: " + UTILS.vec3ToArr(arrowInitialVelocity));
 
-    var vy0 = arrowInitialVelocity.y;
     var y0 = arrowInitialPosition.y;
+    var vy0 = arrowInitialVelocity.y;
     
-    var time = vy0 + ( Math.sqrt(Math.pow(vy0, 2) + 2 * g * y0) / g );
-    var riseTime = vy0 / 2;
+    var time = (vy0 + Math.sqrt(Math.pow(vy0, 2) + 2 * g * y0) ) / g ;
+    var riseTime = Math.max(vy0 / g, 0.0);
     var fallTime = time - riseTime;
+
+    console.log(riseTime);
+    console.log(fallTime);
     
     shooting = false;
     // canShoot = true;
     
     // Create tweens to update velocities (first and second half of parabolic trajectory)
-    var v = {x: arrowInitialVelocity.x, y: arrowInitialVelocity.y, z: arrowInitialVelocity.z};
+    var v1 = {x: arrowInitialVelocity.x, y: arrowInitialVelocity.y, z: arrowInitialVelocity.z};
 
-    var arrowTween1 = new TWEEN.Tween(v)
+    var arrowTween1 = new TWEEN.Tween(v1)
     .to({x: arrowInitialVelocity.x, y: 0.0, z: arrowInitialVelocity.z},
         1000 * riseTime)
-    .easing(TWEEN.Easing.Quadratic.In)
+    .easing(TWEEN.Easing.Linear.None)
     .onUpdate( 
         () => {
-            arrow.position.x += v.x;
-            arrow.position.y += v.y;
-            arrow.position.z += v.z;
+            arrow.position.x += v1.x;
+            arrow.position.y += v1.y;
+            arrow.position.z += v1.z;
         }
     );
-
-    var arrowTween2 = new TWEEN.Tween(v)
+    
+    var v2 = {x: arrowInitialVelocity.x, y: 0.0, z: arrowInitialVelocity.z};
+    
+    var arrowTween2 = new TWEEN.Tween(v2)
     .to({x: arrowInitialVelocity.x, y: -1.0 * arrowInitialVelocity.y, z: arrowInitialVelocity.z}, 
         1000 * fallTime
     ) 
+    .easing(TWEEN.Easing.Linear.None)
     .onUpdate( 
         () => {
-            arrow.position.x += v.x;
-            arrow.position.y += v.y;
-            arrow.position.z += v.z;
+            arrow.position.x += v2.x;
+            arrow.position.y += v2.y;
+            arrow.position.z += v2.z;
         })
     .easing(TWEEN.Easing.Quadratic.Out)
     .onComplete(
@@ -732,16 +796,22 @@ function shootArrow() {
             arrow.rotation.x = arrowAngles.x
         }
     );
-
-    arrowTween1 = arrowTween1.onComplete(
-        () => {
-            arrowTweens.push(arrowTween2);
-            arrowTween2.start();
-        }
-    );
     
-    arrowTweens.push(arrowTween1);
-    arrowTweens.push(arrowTweenAngle);
+    const eps = 1e-3;
+    if (riseTime > eps) {
+        arrowTween1 = arrowTween1.onComplete(
+            () => {
+                arrowTweens.push(arrowTween2);
+                arrowTween2.start();
+            }
+        );
+        
+        arrowTweens.push(arrowTween1);
+        arrowTweens.push(arrowTweenAngle);
+    } else {
+        arrowTweens.push(arrowTween2);
+        arrowTweens.push(arrowTweenAngle);
+    }
 
     UTILS.startTweens(arrowTweens);
 }
@@ -752,13 +822,13 @@ function initLinkLowerLimbsX() {
     // Set initial position for lower limbs
     linkJoints.lower.left.thigh.rotation.x = UTILS.degToRad(180);
     linkJoints.lower.left.shin.rotation.x = 0.0;
-    linkJoints.lower.left.foot.rotation.x = 0.0;
-    linkJoints.lower.left.toe.rotation.x = 0.0;
+    // linkJoints.lower.left.foot.rotation.x = 0.0;
+    // linkJoints.lower.left.toe.rotation.x = 0.0;
     
     linkJoints.lower.right.thigh.rotation.x = UTILS.degToRad(180);
     linkJoints.lower.right.shin.rotation.x = 0.0;
-    linkJoints.lower.right.foot.rotation.x = 0.0;
-    linkJoints.lower.right.toe.rotation.x = 0.0;
+    // linkJoints.lower.right.foot.rotation.x = 0.0;
+    // linkJoints.lower.right.toe.rotation.x = 0.0;
 }
 
 function initLinkLowerLimbsZ() {
@@ -767,13 +837,13 @@ function initLinkLowerLimbsZ() {
     // Set initial position for lower limbs
     linkJoints.lower.left.thigh.rotation.z = 0.0;
     linkJoints.lower.left.shin.rotation.z = 0.0;
-    linkJoints.lower.left.foot.rotation.z = 0.0;
-    linkJoints.lower.left.toe.rotation.z = 0.0;
+    // linkJoints.lower.left.foot.rotation.z = 0.0;
+    // linkJoints.lower.left.toe.rotation.z = 0.0;
 
     linkJoints.lower.right.thigh.rotation.z = 0.0;
     linkJoints.lower.right.shin.rotation.z = 0.0;
-    linkJoints.lower.right.foot.rotation.z = 0.0;
-    linkJoints.lower.right.toe.rotation.z = 0.0;
+    // linkJoints.lower.right.foot.rotation.z = 0.0;
+    // linkJoints.lower.right.toe.rotation.z = 0.0;
 }
 
 function controlLinkMovement() {
@@ -1135,13 +1205,6 @@ function stopLinkWalkSideways() {
 // RENDERING FUNCTIONS
 // ============================================================================
 
-
-function onWindowResize() {
-    thirdPersonCamera.aspect = window.innerWidth / window.innerHeight;
-    thirdPersonCamera.updateProjectionMatrix();
-    renderer.setSize( window.innerWidth, window.innerHeight );
-}
-
 function render(time) {
     time *= 0.001;  // convert time to seconds
     
@@ -1149,7 +1212,7 @@ function render(time) {
     
     controlLinkMovement();
     
-    renderer.render(scene, thirdPersonCamera);
+    renderer.render(scene, currentCamera);
     requestAnimationFrame(render);
 }
 
@@ -1166,7 +1229,7 @@ function main() {
     }
 
     if (!controlsSet) {
-        handleControls();
+        setControls();
         return;
     }
     

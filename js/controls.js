@@ -4,7 +4,7 @@ import {
 	Vector3
 } from "../lib/three.js/build/three.module.js";
 
-var CustomPointerLockControls = function ( object, domElement ) {
+var MovementPointerLockControls = function ( object, domElement ) {
 
 	if ( domElement === undefined ) {
 
@@ -177,8 +177,8 @@ var CustomPointerLockControls = function ( object, domElement ) {
 
 };
 
-CustomPointerLockControls.prototype = Object.create( EventDispatcher.prototype );
-CustomPointerLockControls.prototype.constructor = CustomPointerLockControls;
+MovementPointerLockControls.prototype = Object.create( EventDispatcher.prototype );
+MovementPointerLockControls.prototype.constructor = MovementPointerLockControls;
 
 var AimPointerLockControls = function ( object, domElement ) {
 
@@ -326,7 +326,7 @@ var AimPointerLockControls = function ( object, domElement ) {
 AimPointerLockControls.prototype = Object.create( EventDispatcher.prototype );
 AimPointerLockControls.prototype.constructor = AimPointerLockControls;
 
-var ShootPointerLockControls = function ( object, domElement ) {
+var HeadPointerLockControls = function ( object, domElement ) {
 
 	if ( domElement === undefined ) {
 
@@ -338,6 +338,12 @@ var ShootPointerLockControls = function ( object, domElement ) {
 	this.domElement = domElement;
 	this.isLocked = false;
 
+	// Set to constrain the pitch of the camera
+	// Range is 0 to Math.PI radians
+	this.minPolarAngle = 0; // radians
+	this.maxPolarAngle = Math.PI; // radians
+    this.inverted = false;
+    
     //
 	// internals
 	//
@@ -347,6 +353,24 @@ var ShootPointerLockControls = function ( object, domElement ) {
 	var changeEvent = { type: 'change' };
 	var lockEvent = { type: 'lock' };
 	var unlockEvent = { type: 'unlock' };
+
+	function onMouseMove( event ) {
+
+        if ( scope.isLocked === false ) return;
+
+		var movementY = event.movementY || event.mozMovementY || event.webkitMovementY || 0;
+
+        object.rotation.x += movementY * 0.001;
+        object.rotation.x = Math.min(
+            scope.maxPolarAngle, 
+            Math.max(
+                object.rotation.x,
+                scope.minPolarAngle
+            )
+        );
+            
+		scope.dispatchEvent( changeEvent );
+	}
 
 	function onPointerlockChange() {
 
@@ -428,8 +452,7 @@ var ShootPointerLockControls = function ( object, domElement ) {
 
 };
 
-ShootPointerLockControls.prototype = Object.create( EventDispatcher.prototype );
-ShootPointerLockControls.prototype.constructor = ShootPointerLockControls;
+HeadPointerLockControls.prototype = Object.create( EventDispatcher.prototype );
+HeadPointerLockControls.prototype.constructor = HeadPointerLockControls;
 
-
-export { CustomPointerLockControls, AimPointerLockControls, ShootPointerLockControls};
+export { MovementPointerLockControls, AimPointerLockControls, HeadPointerLockControls};
