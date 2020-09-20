@@ -155,12 +155,15 @@ var linkSideTweens = [];
 
 // Arrow movement variables and params
 var arrowTweens = [];
+var nockTween;
+var nockingAmount;
 var shootInitTime;
 var shootFinalTime;
 
+const bowStringMaxStretching = 10.0;
 const arrowForce = 10.0;
 const arrowMass = 1.0; 
-const maxCharge = 2;
+const maxCharge = 2.0;
 const g = 9.81;
 
 
@@ -325,12 +328,17 @@ function initBowJoints() {
 function buildBow() {
     scene.updateMatrixWorld();
 
-    var linkHand = modelsMap.link.root.getObjectByName('handL');
-    var bow = modelsMap.link.root.getObjectByName('Bow');
+    const linkHandL = modelsMap.link.root.getObjectByName('handL');
+    const linkHandR = modelsMap.link.root.getObjectByName('handR');
+    const bow = modelsMap.link.root.getObjectByName('Bow');
 
     modelsMap.bow.root = bow;
-    linkHand.attach(bow);
+    linkHandL.attach(bow);
     initBowJoints();
+
+    const string = modelsMap.bow.joints.string;
+    bow.attach(string);
+    // linkHandR.attach(string);
 }
 
 function buildTarget() {
@@ -353,14 +361,15 @@ function buildArrow() {
     arrow.root.name = "Arrow";
     arrow.root.add(arrow.gltf.scene.children[0]);
 
-    var bow = modelsMap.link.root.getObjectByName('Bow');
-    
+    const bow = modelsMap.bow.root;
+    const string = modelsMap.bow.joints.string;
     bow.add( arrow.root );
+    // string.attach( arrow.root );
     
     arrow.root.scale.multiplyScalar(arrow.scale);
     const rotation = UTILS.degToRad3(arrow.rotation);
     arrow.root.rotation.set(...rotation);
-    
+
     console.log(UTILS.dumpObject(arrow.root));
 }
 
@@ -374,7 +383,7 @@ function buildScene() {
     scene.background = new THREE.Color( fogColor );
 
     createLight();
-    createFog();
+    // createFog();
 
     createGround();  
     buildModels();
@@ -626,6 +635,7 @@ function setShootControls () {
 
         shooting = true;
         shootInitTime = performance.now();
+        nockArrow();
     };
 
     var onClickRelease = function (event) {
@@ -695,6 +705,33 @@ function onWindowResize() {
 // ANIMATION FUNCTIONS
 // ============================================================================
 
+function nockArrow() {
+    const link = modelsMap.link.root;
+    const bowString = link.getObjectByName('string');
+    const arrow = modelsMap.arrow.root;
+    
+    const stringPosition = bowString.position.z;
+    const arrowPosition = arrow.position.z;
+
+    var delta = { dz: 0.0 };
+    nockTween = new TWEEN.Tween( delta )
+    .to({dz: bowStringMaxStretching}, 1000*maxCharge)
+    .easing(TWEEN.Easing.Quadratic.In)
+    .onUpdate(
+        () => {
+            bowString.position.z = stringPosition - delta.dz;
+            arrow.position.z = arrowPosition - delta.dz;
+            nockingAmount = delta.dz;
+        }
+    )
+    .onComplete(
+        () => {
+            console.log("Max nocking!");
+        }
+    )
+    .start();
+}
+
 function computeArrowDirection() {
     // World axis: 
     // links rotation (x axis)
@@ -718,9 +755,11 @@ function computeArrowInitialVelocity(direction) {
 
 function shootArrow() {
     console.log("Arrow shot!");
+    const link = modelsMap.link.root;
+    var bow = link.getObjectByName('Bow');
+    const bowString = link.getObjectByName('string');
     const arrow = modelsMap.arrow.root;
     
-    var bow = modelsMap.link.root.getObjectByName('Bow');
     SceneUtils.detach(arrow, bow, scene);
     
     // Compute arrow trajectory
@@ -742,13 +781,28 @@ function shootArrow() {
     var time = (vy0 + Math.sqrt(Math.pow(vy0, 2) + 2 * g * y0) ) / g ;
     var riseTime = Math.max(vy0 / g, 0.0);
     var fallTime = time - riseTime;
-
-    console.log(riseTime);
-    console.log(fallTime);
     
+    console.log("Rise time: " + riseTime);
+    console.log("Fall time: " + fallTime);
+
     shooting = false;
     // canShoot = true;
     
+    // Create tween to shoot arrow
+    const stringPosition = bowString.position.z;
+    const arrowPosition = arrow.position.z;
+    
+    var delta = {dz: nockingAmount};
+    var shootTween = new TWEEN.Tween(delta)
+    .to({dz: 0.0}, 0.1)
+    .easing(TWEEN.Easing.Quadratic.Out)
+    .onUpdate(
+        () => {
+            bowString.position.z = stringPosition + (nockingAmount - delta.dz);
+            arrow.position.z = arrowPosition + (nockingAmount - delta.dz);
+        }
+    );
+
     // Create tweens to update velocities (first and second half of parabolic trajectory)
     var v1 = {x: arrowInitialVelocity.x, y: arrowInitialVelocity.y, z: arrowInitialVelocity.z};
 
@@ -796,24 +850,45 @@ function shootArrow() {
             arrow.rotation.x = arrowAngles.x
         }
     );
-    
+
     const eps = 1e-3;
     if (riseTime > eps) {
+        shootTween = shootTween.onComplete(
+            () => {
+                arrowTweens.push(arrowTween1);
+                arrowTweens.push(arrowTweenAngle);
+
+                arrowTween1.start();
+                arrowTweenAngle.start();
+            }   
+        );
         arrowTween1 = arrowTween1.onComplete(
             () => {
                 arrowTweens.push(arrowTween2);
                 arrowTween2.start();
             }
         );
-        
-        arrowTweens.push(arrowTween1);
-        arrowTweens.push(arrowTweenAngle);
+        arrowTweens.push(shootTween);
+        // arrowTweens.push(arrowTween1);
+        // arrowTweens.push(arrowTweenAngle);
     } else {
-        arrowTweens.push(arrowTween2);
-        arrowTweens.push(arrowTweenAngle);
+        shootTween = shootTween.onComplete(
+            () => {
+                arrowTweens.push(arrowTween2);
+                arrowTweens.push(arrowTweenAngle);
+
+                arrowTween2.start();
+                arrowTweenAngle.start();
+            }   
+        );
+        arrowTweens.push(shootTween);
+        // arrowTweens.push(arrowTween2);
+        // arrowTweens.push(arrowTweenAngle);
     }
 
-    UTILS.startTweens(arrowTweens);
+    nockTween.stop();
+    shootTween.start();
+    // UTILS.startTweens(arrowTweens);
 }
 
 function initLinkLowerLimbsX() {
@@ -1211,6 +1286,15 @@ function render(time) {
     TWEEN.update();
     
     controlLinkMovement();
+
+    // const bowString = modelsMap.link.root.getObjectByName('string');
+    // const arrow = modelsMap.arrow.root;
+    
+    // var stringPosition = bowString.position.z;
+    // var arrowPosition = arrow.position.z;
+
+    // console.log("String: " + stringPosition);
+    // console.log("Arrow: " + arrowPosition);
     
     renderer.render(scene, currentCamera);
     requestAnimationFrame(render);
