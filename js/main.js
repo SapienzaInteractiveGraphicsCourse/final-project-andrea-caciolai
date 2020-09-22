@@ -195,6 +195,10 @@ function init() {
 
     renderer.shadowMap.enabled = true;
     window.addEventListener( 'resize', onWindowResize, false );
+
+    
+    // Hide the loading bar
+    document.querySelector('#loadingScreen').hidden = true;
 }
 
 // ============================================================================
@@ -204,8 +208,6 @@ function init() {
 function loadModels() {   
     loadingManager.onLoad = function() {
         console.log('Loading complete!');
-        // hide the loading bar
-        document.querySelector('#loading').hidden = true;
         gameState.modelsLoaded = true;
         main();
     };
@@ -234,8 +236,7 @@ function loadModels() {
 }
 
 function buildModels() {
-    const loadingElem = document.querySelector('#loading');
-    loadingElem.style.display = 'none';
+    
 
     loadModelsList.forEach( model => {
         // const root = new THREE.Object3D();
@@ -492,13 +493,17 @@ function createGround() {
 // ============================================================================
 
 function initGUI() {
-    var instructions = document.getElementById( 'instructions' );
+    // Hide game menu
+    document.querySelector( '#gameMenu' ).style.display = 'none';
 
-    blocker.style.display = 'block';
-    instructions.style.display = '';
+    // Show loading screen
+    document.querySelector( '#loadingScreen' ).style.display = 'block';
 
-    var crosshair = document.getElementById( 'crosshair' );
-    crosshair.style.display = 'none';
+    // Hide pauseScreen
+    document.querySelector( '#pauseScreen' ).style.display = 'none';
+
+    // Hide crosshair
+    document.querySelector( '#crosshair' ).style.display = 'none';
 }
 
 function switchCamera() {
@@ -665,9 +670,9 @@ function setShootControls () {
 }
 
 function setListeners(controls) {
-    var instructions = document.getElementById( 'instructions' );
+    var pauseScreen = document.getElementById( 'pauseScreen' );
 
-    instructions.addEventListener( 'click', function () {
+    pauseScreen.addEventListener( 'click', function () {
 
         controls.lock();
 
@@ -675,22 +680,18 @@ function setListeners(controls) {
 
     controls.addEventListener( 'lock', function () {
 
-        instructions.style.display = 'none';
-        blocker.style.display = 'none';
+        pauseScreen.style.display = 'none';
         gameState.gamePaused = false;
     } );
 
     controls.addEventListener( 'unlock', function () {
 
-        blocker.style.display = 'block';
-        instructions.style.display = '';
+        pauseScreen.style.display = 'block';
         gameState.gamePaused = true;
     } );
 }
 
 function setControls() {
-    initGUI();
-    
     // setOrbitControls();
     setPlayerControls();
     setBowControls();
@@ -705,6 +706,14 @@ function setControls() {
 
     gameState.controlsSet = true;
     main();
+}
+
+function lockControls() {
+    gameControls.forEach(
+        (controls) => {
+            controls.lock();
+        }
+    );
 }
 
 function onWindowResize() {
@@ -1038,13 +1047,16 @@ function render(time) {
     requestAnimationFrame(render);
 }
 
-function main() {
+export function main() {
+    initGUI();
+
     if (!gameState.modelsLoaded) {
         loadAssets();
         return;
     }
     
     if (!gameState.sceneBuilt) {
+        document.querySelector('#loadingScreen').style.display = 'none';
         init();
         buildScene();
         return;
@@ -1054,7 +1066,11 @@ function main() {
         setControls();
         return;
     }
+
+    if (gameState.controlsSet) {
+        lockControls();
+    }
     
     requestAnimationFrame(render);
 }
-main();
+// main();
