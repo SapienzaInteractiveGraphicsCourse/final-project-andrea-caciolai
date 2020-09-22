@@ -25,14 +25,27 @@
         </div>
 
         <!-- INTERFACE -->
-        <div id="gameMenu" class="container">
-            <h2>Link's Training</h2>
-            
-            <button id="playButton" type="button" class="btn btn-dark btn-lg">Play</button>
+        <div id="gameMenu" class="justify-content-center vertical-center">
+            <div class="container" style="width: 400px;">
+                <div class="row p-3">
+                    <div class="col-sm" style="width: fit-content;">
+                        <h2>Link's Training</h2>
+                    </div>
+                </div>
+                
+                <div class="row p-3">
+                    <div class="col-sm" style="width: fit-content;">
+                        <button id="playButton" type="button" class="btn btn-success btn-lg">Play</button>
+                    </div>
+                </div>
+                
+                <div class="row p-3">
+                    <div class="col-sm" style="width: fit-content;">
+                        <button type="button" class="btn btn-info btn-lg" data-toggle="modal" data-target="#instructionsModal">Controls</button>
+                    </div>
+                </div>
+            </div>
 
-            <!-- Controls button -->
-            <button type="button" class="btn btn-info btn-lg" data-toggle="modal" data-target="#instructionsModal">Controls</button>
-          
             <!-- Controls -->
             <div class="modal fade" id="instructionsModal" role="dialog">
                 <div class="modal-dialog">
@@ -54,14 +67,11 @@
                     </div>
                 </div>
             </div>
-          </div>
-        <!-- Loading and pause screen -->
-        <div id="loadingScreen" style="display: none;">
-            <div>
-              <div>...Loading...</div>
-              <div class="progress"><div id="progressbar"></div></div>
-            </div>
         </div>
+        <!-- Loading and pause screen -->
+        <section id="loadingScreen" style="display: none;">
+            <div id="loader"></div>
+        </section>
         <div id="pauseScreen" style="display: none;">
 			<div id="instructions">
 				<span style="font-size:36px">Game paused. Click to play</span>

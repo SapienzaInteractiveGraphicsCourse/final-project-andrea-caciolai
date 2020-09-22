@@ -18,7 +18,7 @@ var loadingManager;
 
 // Game state
 var gameState = {
-    gamePaused: true,
+    gamePaused: false,
     modelsLoaded: false,
     sceneBuilt: false,
     controlsSet: false,
@@ -208,14 +208,16 @@ function init() {
 function loadModels() {   
     loadingManager.onLoad = function() {
         console.log('Loading complete!');
+        // document.querySelector('#loadingScreen').style.display = 'none';
+        document.querySelector('#loadingScreen').classList.add( 'fade-out' );
         gameState.modelsLoaded = true;
         main();
     };
 
-    const progressbarElem = document.querySelector('#progressbar');
-    loadingManager.onProgress = (url, itemsLoaded, itemsTotal) => {
-        progressbarElem.style.width = `${itemsLoaded / itemsTotal * 100 | 0}%`;
-    };
+    // const progressbarElem = document.querySelector('#progressbar');
+    // loadingManager.onProgress = (url, itemsLoaded, itemsTotal) => {
+    //     progressbarElem.style.width = `${itemsLoaded / itemsTotal * 100 | 0}%`;
+    // };
     
     const gltfLoader = new GLTFLoader(loadingManager);
     loadModelsList.forEach( model => {
@@ -1040,8 +1042,9 @@ function render(time) {
         if ( gameState.arrowFlying ) {
             animateArrowFlight(time);
         }
-        prevTime = time;
     }
+    
+    prevTime = time;
     
     renderer.render(scene, currentCamera);
     requestAnimationFrame(render);
@@ -1056,7 +1059,6 @@ export function main() {
     }
     
     if (!gameState.sceneBuilt) {
-        document.querySelector('#loadingScreen').style.display = 'none';
         init();
         buildScene();
         return;
