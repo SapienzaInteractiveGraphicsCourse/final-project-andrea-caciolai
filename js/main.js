@@ -39,9 +39,13 @@ var light;
 var ambient;
 
 var currentCamera;
+var currentCameraIdx = 0;
+
 var firstPersonCamera;
 var thirdPersonCamera;
 var arrowCamera;
+
+var cameras;
 
 // Model variables
 var modelsMap;
@@ -112,11 +116,8 @@ const aspect = window.innerWidth / window.innerHeight;  // the canvas default
 const near = 0.1;
 const far = 100000;
 
-const firstPersonCameraPosition = [ 2.0, 3.0, -10.0 ];
+const firstPersonCameraPosition = [ 2.0, 3.0, -12.0 ];
 const firstPersonCameraTarget = [ 2.0, 3.0, 1.0 ];
-
-const thirdPersonCameraPosition = [ modelsMap.link.position[0], modelsMap.link.position[1] + 3, modelsMap.link.position[2] - 5 ];
-const thirdPersonCameraTarget = [ modelsMap.link.position[0], modelsMap.link.position[1] + 2 , modelsMap.link.position[2] ];
 
 const fogNear = 50;
 const fogFar = 1000;
@@ -124,7 +125,7 @@ const fogColor = 0xcce0ff;
 
 // Light parameters
 const lightDistance = 200;
-const lightPosition = [ 0, 1, 2 ];
+const lightPosition = [ -0.5, 1, -2 ];
 const lightTarget = [ 0, 0, 0 ];
 const lightColor = 0xFFFFFFFF;
 const lightIntensity = 5;
@@ -139,11 +140,9 @@ const shadowCameraDepth = 1000;
 // Link movement variables and params
 const floorFriction = 10.0;
 const linkMovementSpeed = 100.0;
-// const linkJumpSpeed = 200.0;
 const linkMass = 100.0;
 
 const g = 9.81;
-const eps = 1e-3;
 const movThreshold = 0.01*linkMovementSpeed;
 
 var linkMovement = {
@@ -157,16 +156,13 @@ var prevTime = performance.now();
 var linkVelocity = new THREE.Vector3();
 var linkDirection = new THREE.Vector3();
 
-var linkForwardTweens = [];
-var linkBackwardTweens = [];
-var linkSideTweens = [];
+var linkMovementTweens = [];
 
 // Arrow movement variables and params
 const arrowAcceleration = new THREE.Vector3(0, -1.0*g, 0.0);
 var arrowVelocity = new THREE.Vector3();
 var arrowDirection = new THREE.Vector3();
 
-var arrowTweens = [];
 var nockTween;
 var nockingAmount;
 
@@ -208,16 +204,11 @@ function init() {
 function loadModels() {   
     loadingManager.onLoad = function() {
         console.log('Loading complete!');
-        // document.querySelector('#loadingScreen').style.display = 'none';
         document.querySelector('#loadingScreen').classList.add( 'fade-out' );
         gameState.modelsLoaded = true;
         main();
     };
 
-    // const progressbarElem = document.querySelector('#progressbar');
-    // loadingManager.onProgress = (url, itemsLoaded, itemsTotal) => {
-    //     progressbarElem.style.width = `${itemsLoaded / itemsTotal * 100 | 0}%`;
-    // };
     
     const gltfLoader = new GLTFLoader(loadingManager);
     loadModelsList.forEach( model => {
@@ -238,24 +229,19 @@ function loadModels() {
 }
 
 function buildModels() {
-    
-
     loadModelsList.forEach( model => {
-        // const root = new THREE.Object3D();
         model.buildCallback();
     });
 }
 
-function initLinkJoints() {
+function buildLinkJoints() {
     const link = modelsMap.link;
 
     link.root.traverse(obj => {
 
         if ( obj.isBone ) {
-            // console.log(obj.name);
-            // console.log(obj.rotation);
-            
-            if (obj.name === 'spine006') {
+
+            if (obj.name === 'spine004') {
                 link.joints.upper.head = obj;
             }
 
@@ -326,7 +312,7 @@ function buildLink() {
     
     buildBow();
 
-    initLinkJoints();
+    buildLinkJoints();
 
     console.log(UTILS.dumpObject(link.root));
 }
@@ -394,15 +380,13 @@ function buildScene() {
     scene = new THREE.Scene();
     scene.background = new THREE.Color( fogColor );
 
-    createLight();
+    buildLight();
     // createFog();
 
-    createGround();  
+    buildGround();  
     buildModels();
 
-    createFirstPersonCamera();
-    createThirdPersonCamera();
-    createArrowCamera();
+    buildCameras();
 
     gameState.sceneBuilt = true;
     currentCamera = thirdPersonCamera;
@@ -413,9 +397,10 @@ function createFog() {
     scene.fog = new THREE.Fog( fogColor, fogNear, fogFar );
 }
 
-function createFirstPersonCamera() {
+function buildFirstPersonCamera() {
     firstPersonCamera = new THREE.PerspectiveCamera(fov, aspect, near, far);    
-    const bow = modelsMap.link.root.getObjectByName('Bow');
+    // const bow = modelsMap.link.root.getObjectByName('Bow');
+    const bow = modelsMap.bow.root;
 
     firstPersonCamera.position.set( ...firstPersonCameraPosition );
     firstPersonCamera.lookAt( ...firstPersonCameraTarget );
@@ -423,9 +408,13 @@ function createFirstPersonCamera() {
     bow.add( firstPersonCamera );
 }
 
-function createThirdPersonCamera() {
-    thirdPersonCamera = new THREE.PerspectiveCamera(fov, aspect, near, far);    
+function buildThirdPersonCamera() {
     const link = modelsMap.link.root;
+
+    const thirdPersonCameraPosition = [ link.position.x, link.position.y + 3, link.position.z - 5 ];
+    const thirdPersonCameraTarget = [ link.position.x, link.position.y + 2 , link.position.z ];
+
+    thirdPersonCamera = new THREE.PerspectiveCamera(fov, aspect, near, far);    
 
     thirdPersonCamera.position.set( ...thirdPersonCameraPosition );
     thirdPersonCamera.lookAt( ...thirdPersonCameraTarget );
@@ -433,8 +422,27 @@ function createThirdPersonCamera() {
     link.add( thirdPersonCamera );
 }
 
-function createArrowCamera() {
+function buildArrowCamera() {
+    const arrow = modelsMap.arrow.root;
 
+    const yOffset = 0.1;
+    const arrowCameraPosition = [ arrow.position.x, arrow.position.y + yOffset, arrow.position.z ];
+    const arrowCameraTarget = [ arrow.position.x, arrow.position.y + yOffset, arrow.position.z + 1 ];
+
+    arrowCamera = new THREE.PerspectiveCamera(fov, aspect, near, far);
+
+    arrowCamera.position.set( ...arrowCameraPosition );
+    arrowCamera.lookAt( ...arrowCameraTarget );
+
+    arrow.add( arrowCamera );
+}
+
+function buildCameras() {
+    buildFirstPersonCamera();
+    buildThirdPersonCamera();
+    buildArrowCamera();
+
+    cameras = [thirdPersonCamera, firstPersonCamera];
 }
 
 function createDirectionalLight() {
@@ -466,12 +474,12 @@ function createAmbientLight() {
     scene.add( ambient );
 }
 
-function createLight() {
+function buildLight() {
     createDirectionalLight();
     createAmbientLight();
 }
 
-function createGround() {
+function buildGround() {
     var groundTexture = textureLoader.load( '../assets/textures/grass_texture.png' );
     groundTexture.wrapS = groundTexture.wrapT = THREE.RepeatWrapping;
     groundTexture.repeat.set( 32, 32 );
@@ -509,14 +517,20 @@ function initGUI() {
 }
 
 function switchCamera() {
+
+    if ( gameState.arrowFlying ) {
+        return;
+    }
+
+    currentCameraIdx = (currentCameraIdx + 1) % cameras.length;
+    currentCamera = cameras[currentCameraIdx];
+
     if ( currentCamera === firstPersonCamera ) {
-        currentCamera = thirdPersonCamera;
+        var crosshair = document.getElementById( 'crosshair' );
+        crosshair.style.display = 'block';
+    } else {
         var crosshair = document.getElementById( 'crosshair' );
         crosshair.style.display = 'none';
-    } else {
-        currentCamera = firstPersonCamera;
-        var crosshair = document.getElementById( 'crosshair' );
-        crosshair.style.display = '';
     }
 }
 
@@ -776,7 +790,7 @@ function computeArrowInitialVelocity(direction) {
     return initialVelocity;
 }
 
-function initLinkLowerLimbsX() {
+function initLinkLowerLimbs() {
     const linkJoints = modelsMap.link.joints;
 
     // Set initial position for lower limbs
@@ -823,7 +837,7 @@ function animateLinkMovement(time) {
     // Stop animation if no movement
     if ( (Math.abs(linkVelocity.z) < movThreshold) && (Math.abs(linkVelocity.x) < movThreshold) ) {
         stopLinkWalkAnimation();
-        initLinkLowerLimbsX();
+        initLinkLowerLimbs();
     }
 
     // Update vertical position
@@ -844,9 +858,9 @@ function startLinkWalkAnimation() {
     const linkJoints = modelsMap.link.joints;
 
     // Set initial position for lower limbs
-    if ( linkForwardTweens.length != 0 ) return;
+    if ( linkMovementTweens.length != 0 ) return;
     
-    initLinkLowerLimbsX();
+    initLinkLowerLimbs();
 
     // Params
     const time1 = 200;
@@ -931,14 +945,14 @@ function startLinkWalkAnimation() {
 	);
 
     // Add tweens to list
-    linkForwardTweens.push(thighTween1);
-    linkForwardTweens.push(shinTween1);
+    linkMovementTweens.push(thighTween1);
+    linkMovementTweens.push(shinTween1);
 
-    linkForwardTweens.push(thighTween2);
-    linkForwardTweens.push(shinTween2);
+    linkMovementTweens.push(thighTween2);
+    linkMovementTweens.push(shinTween2);
     
-    linkForwardTweens.push(thighTween3);
-    linkForwardTweens.push(shinTween3);
+    linkMovementTweens.push(thighTween3);
+    linkMovementTweens.push(shinTween3);
 
     // Start tweens in a cyclic fashion
     thighTween1.onComplete( () => { thighTween2.start(); } );
@@ -955,8 +969,8 @@ function startLinkWalkAnimation() {
 }
 
 function stopLinkWalkAnimation() {
-    UTILS.stopTweens(linkForwardTweens);
-    linkForwardTweens = [];
+    UTILS.stopTweens(linkMovementTweens);
+    linkMovementTweens = [];
 }
 
 function startArrowAnimation() {    
@@ -978,8 +992,8 @@ function startArrowAnimation() {
     // Initial velocity
     var arrowInitialVelocity = computeArrowInitialVelocity(dir);
 
-    console.log("Initial position: " + UTILS.vec3ToArr(arrowInitialPosition));
-    console.log("Initial velocity: " + UTILS.vec3ToArr(arrowInitialVelocity));
+    // console.log("Initial position: " + UTILS.vec3ToArr(arrowInitialPosition));
+    // console.log("Initial velocity: " + UTILS.vec3ToArr(arrowInitialVelocity));
 
     arrowVelocity.copy(arrowInitialVelocity);
 
@@ -1001,12 +1015,12 @@ function startArrowAnimation() {
         () => {
             gameState.shooting = false;
             gameState.arrowFlying = true;
+
+            currentCamera = arrowCamera;
         }
     );
     
     nockTween.stop();
-    arrowTweens = [];
-    arrowTweens.push(shootTween);
     shootTween.start();
 }
 
@@ -1023,11 +1037,40 @@ function animateArrowFlight(time) {
     arrow.rotateX(Math.PI * Math.abs(arrowDirection.y) * 0.5*dt);
     
     if ( arrow.position.y < 0 ) {
-        gameState.arrowFlying = false;
-        gameState.canShoot = true;
-
-        console.log("Arrow landed!");
+        stopArrowFlight();
     }
+}
+
+function repositionArrow() {
+    const arrow = modelsMap.arrow.root;
+    var bow = modelsMap.bow.root;
+
+    scene.remove(arrow);
+    bow.add(arrow);
+
+    arrow.position.x = 0.0;
+    arrow.position.y = 0.0;
+    arrow.position.z = 0.0;
+
+    arrow.rotation.x = 0.0;
+    arrow.rotation.y = 0.0;
+    arrow.rotation.z = 0.0;
+}
+
+function stopArrowFlight() {
+    gameState.arrowFlying = false;
+
+    console.log("Arrow landed!");
+
+    var delayedStopArrowTween = new TWEEN.Tween({})
+    .to({}, 1000)
+    .onComplete(
+        () => {
+            currentCamera = cameras[currentCameraIdx];
+            repositionArrow();
+            gameState.canShoot = true;
+        })
+    .start();
 }
 
 // ============================================================================
