@@ -19,16 +19,20 @@ var loadingManager;
 // Game state
 var gameState = {
     gamePaused: false,
+    optionsSet: false,
+    guiInitialized: false,
     modelsLoaded: false,
     sceneBuilt: false,
     controlsSet: false,
-    canShoot: true,
+    canShoot: false,
     shooting: false,
     shootInitTime: null,
     shootFinalTime: null,
     arrowFlying: false,
 };
 
+var difficulty;
+var daylight;
 
 var playerControls;
 var gameControls = [];
@@ -48,10 +52,10 @@ var arrowCamera;
 var cameras;
 
 // Model variables
-var modelsMap;
+var models;
 var loadModelsList;
 
-modelsMap = {
+models = {
     link:    { 
         url: '../assets/models/link_with_bow/link_with_bow.gltf',
         position: [ 0, 0, 0 ],
@@ -70,7 +74,10 @@ modelsMap = {
                     forearm: null,
                     hand: null,
                 },
-                head: null
+                head: null,
+                spine001: null,
+                spine002: null,
+                spine003: null,
             },
             lower: {
                 left: {
@@ -108,7 +115,7 @@ modelsMap = {
     }
 };
 
-loadModelsList = [modelsMap.link, modelsMap.target, modelsMap.arrow];
+loadModelsList = [models.link, models.target, models.arrow];
 
 // Camera parameters
 const fov = 45;
@@ -138,6 +145,39 @@ const shadowCameraHeight = 100;
 const shadowCameraDepth = 1000;
 
 // Link movement variables and params
+var linkRestJoints = {
+    upper: {
+        left: {
+            arm: null,
+            forearm: null,
+            hand: null,
+        },
+        right: {
+            arm: null,
+            forearm: null,
+            hand: null,
+        },
+        head: null,
+        spine001: null,
+        spine002: null,
+        spine003: null,
+    },
+    lower: {
+        left: {
+            thigh: null,
+            shin: null,
+            foot: null,
+            toe: null,
+        },
+        right: {
+            thigh: null,
+            shin: null,
+            foot: null,
+            toe: null,
+        },
+    }   
+}
+
 const floorFriction = 10.0;
 const linkMovementSpeed = 100.0;
 const linkMass = 100.0;
@@ -183,7 +223,7 @@ function loadAssets() {
     loadModels();
 }
 
-function init() {
+function initWebGL() {
     renderer = new THREE.WebGLRenderer();
     renderer.setPixelRatio( window.devicePixelRatio );
     renderer.setSize( window.innerWidth, window.innerHeight );
@@ -197,13 +237,41 @@ function init() {
     document.querySelector('#loadingScreen').hidden = true;
 }
 
+function initGUI() {
+    // Hide game menu
+    document.querySelector( '#gameMenu' ).hidden = true;
+
+    // Show loading screen
+    document.querySelector( '#loadingScreen' ).hidden = false;
+
+    // Hide pauseScreen
+    document.querySelector( '#gameMenu' ).hidden = true;
+
+
+    // Hide crosshair
+    document.querySelector( '#crosshair' ).hidden = true;
+
+
+    gameState.guiInitialized = true;
+}
+
+function setOptions() {
+    difficulty = $("#difficultySelect :selected").val(); 
+    daylight = $('input[name=daylightRadio]:checked', '#daylightForm').val()
+
+    // console.log(difficulty);
+    // console.log(daylight);
+
+    gameState.optionsSet = true;
+}
+
 // ============================================================================
-// MODEL(s) CODE (Loading, building, displaying)
+// MODEL(s) CODE 
 // ============================================================================
 
 function loadModels() {   
     loadingManager.onLoad = function() {
-        console.log('Loading complete!');
+        // console.log('Loading complete!');
         document.querySelector('#loadingScreen').classList.add( 'fade-out' );
         gameState.modelsLoaded = true;
         main();
@@ -234,72 +302,117 @@ function buildModels() {
     });
 }
 
-function buildLinkJoints() {
-    const link = modelsMap.link;
+function initLinkJoints() {
+    const link = models.link;
 
     link.root.traverse(obj => {
 
         if ( obj.isBone ) {
-
+            // Head and back 
+            if (obj.name === 'spine001') {
+                link.joints.upper.spine001 = obj;
+                linkRestJoints.upper.spine001 = new THREE.Euler();
+                linkRestJoints.upper.spine001.copy(obj.rotation);
+            }
+            if (obj.name === 'spine002') {
+                link.joints.upper.spine002 = obj;
+                linkRestJoints.upper.spine002 = new THREE.Euler();
+                linkRestJoints.upper.spine002.copy(obj.rotation);
+            }
+            if (obj.name === 'spine003') {
+                link.joints.upper.spine003 = obj;
+                linkRestJoints.upper.spine003 = new THREE.Euler();
+                linkRestJoints.upper.spine003.copy(obj.rotation);
+            }
             if (obj.name === 'spine004') {
                 link.joints.upper.head = obj;
+                linkRestJoints.upper.head = new THREE.Euler();
+                linkRestJoints.upper.head.copy(obj.rotation);
             }
 
             // Upper left limbs
             if (obj.name === 'upper_armL') {
                 link.joints.upper.left.arm = obj;
+                linkRestJoints.upper.left.arm = new THREE.Euler();
+                linkRestJoints.upper.left.arm.copy(obj.rotation);
             }
             if (obj.name === 'forearmL') {
                 link.joints.upper.left.forearm = obj;
+                linkRestJoints.upper.left.forearm = new THREE.Euler();
+                linkRestJoints.upper.left.forearm.copy(obj.rotation);
             }
             if (obj.name === 'handL') {
                 link.joints.upper.left.hand = obj;
+                linkRestJoints.upper.left.hand = new THREE.Euler();
+                linkRestJoints.upper.left.hand.copy(obj.rotation);
             }
         
             // Upper right limbs
             if (obj.name === 'upper_armR') {
                 link.joints.upper.right.arm = obj;
+                linkRestJoints.upper.right.arm = new THREE.Euler();
+                linkRestJoints.upper.right.arm.copy(obj.rotation);
             }
             if (obj.name === 'forearmR') {
                 link.joints.upper.right.forearm = obj;
+                linkRestJoints.upper.right.forearm = new THREE.Euler();
+                linkRestJoints.upper.right.forearm.copy(obj.rotation);
             }
             if (obj.name === 'handR') {
                 link.joints.upper.right.hand = obj;
+                linkRestJoints.upper.right.hand = new THREE.Euler();
+                linkRestJoints.upper.right.hand.copy(obj.rotation);
             }
         
             // Lower left limbs
             if (obj.name === 'thighL') {
                 link.joints.lower.left.thigh = obj;
+                linkRestJoints.lower.left.thigh = new THREE.Euler();
+                linkRestJoints.lower.left.thigh.copy(obj.rotation);
             }
             if (obj.name === 'shinL') {
                 link.joints.lower.left.shin = obj;
+                linkRestJoints.lower.left.shin = new THREE.Euler();
+                linkRestJoints.lower.left.shin.copy(obj.rotation);
             }
             if (obj.name === 'footL') {
                 link.joints.lower.left.foot = obj;
+                linkRestJoints.lower.left.foot = new THREE.Euler();
+                linkRestJoints.lower.left.foot.copy(obj.rotation);
             }
             if (obj.name === 'toeL') {
                 link.joints.lower.left.toe = obj;
+                linkRestJoints.lower.left.toe = new THREE.Euler();
+                linkRestJoints.lower.left.toe.copy(obj.rotation);
             }
         
             // Lower right limbs
             if (obj.name === 'thighR') {
                 link.joints.lower.right.thigh = obj;
+                linkRestJoints.lower.right.thigh = new THREE.Euler();
+                linkRestJoints.lower.right.thigh.copy(obj.rotation);
             }
             if (obj.name === 'shinR') {
                 link.joints.lower.right.shin = obj;
+                linkRestJoints.lower.right.shin = new THREE.Euler();
+                linkRestJoints.lower.right.shin.copy(obj.rotation);
             }
             if (obj.name === 'footR') {
                 link.joints.lower.right.foot = obj;
+                linkRestJoints.lower.right.foot = new THREE.Euler();
+                linkRestJoints.lower.right.foot.copy(obj.rotation);
             }
             if (obj.name === 'toeR') {
                 link.joints.lower.right.toe = obj;
+                linkRestJoints.lower.right.toe = new THREE.Euler();
+                linkRestJoints.lower.right.toe.copy(obj.rotation);
             }
         }
     });
 }
 
 function buildLink() {
-    const link = modelsMap.link;
+    const link = models.link;
     const clonedScene = SkeletonUtils.clone(link.gltf.scene);
     link.root = clonedScene.children[0];
     
@@ -312,35 +425,35 @@ function buildLink() {
     
     buildBow();
 
-    buildLinkJoints();
+    initLinkJoints();
 
     console.log(UTILS.dumpObject(link.root));
 }
 
 function initBowJoints() {
-    const bow = modelsMap.bow;
-    const string = modelsMap.link.root.getObjectByName('string');
+    const bow = models.bow;
+    const string = models.link.root.getObjectByName('string');
     bow.joints.string = string;
 }
 
 function buildBow() {
     scene.updateMatrixWorld();
 
-    const linkHandL = modelsMap.link.root.getObjectByName('handL');
-    const linkHandR = modelsMap.link.root.getObjectByName('handR');
-    const bow = modelsMap.link.root.getObjectByName('Bow');
+    const linkHandL = models.link.root.getObjectByName('handL');
+    const linkHandR = models.link.root.getObjectByName('handR');
+    const bow = models.link.root.getObjectByName('Bow');
 
-    modelsMap.bow.root = bow;
+    models.bow.root = bow;
     linkHandL.attach(bow);
     initBowJoints();
 
-    const string = modelsMap.bow.joints.string;
+    const string = models.bow.joints.string;
     bow.attach(string);
     // linkHandR.attach(string);
 }
 
 function buildTarget() {
-    const target = modelsMap.target;
+    const target = models.target;
     target.root = target.gltf.scene.children[0];
     
     target.root.position.set(...target.position);
@@ -353,16 +466,19 @@ function buildTarget() {
 }
 
 function buildArrow() {
-    const arrow = modelsMap.arrow;
+    const link = models.link;
+    const bow = models.bow;
+    const arrow = models.arrow;
     
     arrow.root = new THREE.Object3D();
     arrow.root.name = "Arrow";
     arrow.root.add(arrow.gltf.scene.children[0]);
 
-    const bow = modelsMap.bow.root;
-    const string = modelsMap.bow.joints.string;
-    bow.add( arrow.root );
-    // string.attach( arrow.root );
+    bow.root.add( arrow.root );
+    
+    const handR = link.joints.upper.right.hand;
+    const string = bow.joints.string;
+    handR.attach( string );
     
     arrow.root.scale.multiplyScalar(arrow.scale);
     const rotation = UTILS.degToRad3(arrow.rotation);
@@ -376,6 +492,7 @@ function buildArrow() {
 // SCENE BUILDING FUNCTIONS
 // ============================================================================
 
+// Scene
 function buildScene() {
     scene = new THREE.Scene();
     scene.background = new THREE.Color( fogColor );
@@ -390,17 +507,17 @@ function buildScene() {
 
     gameState.sceneBuilt = true;
     currentCamera = thirdPersonCamera;
-    main();
 }
 
 function createFog() {
     scene.fog = new THREE.Fog( fogColor, fogNear, fogFar );
 }
 
+// Cameras
 function buildFirstPersonCamera() {
     firstPersonCamera = new THREE.PerspectiveCamera(fov, aspect, near, far);    
     // const bow = modelsMap.link.root.getObjectByName('Bow');
-    const bow = modelsMap.bow.root;
+    const bow = models.bow.root;
 
     firstPersonCamera.position.set( ...firstPersonCameraPosition );
     firstPersonCamera.lookAt( ...firstPersonCameraTarget );
@@ -409,7 +526,7 @@ function buildFirstPersonCamera() {
 }
 
 function buildThirdPersonCamera() {
-    const link = modelsMap.link.root;
+    const link = models.link.root;
 
     const thirdPersonCameraPosition = [ link.position.x, link.position.y + 3, link.position.z - 5 ];
     const thirdPersonCameraTarget = [ link.position.x, link.position.y + 2 , link.position.z ];
@@ -423,13 +540,15 @@ function buildThirdPersonCamera() {
 }
 
 function buildArrowCamera() {
-    const arrow = modelsMap.arrow.root;
+    const arrow = models.arrow.root;
 
     const yOffset = 0.1;
-    const arrowCameraPosition = [ arrow.position.x, arrow.position.y + yOffset, arrow.position.z ];
-    const arrowCameraTarget = [ arrow.position.x, arrow.position.y + yOffset, arrow.position.z + 1 ];
+    const zOffset = 0.2;
 
-    arrowCamera = new THREE.PerspectiveCamera(fov, aspect, near, far);
+    const arrowCameraPosition = [ arrow.position.x, arrow.position.y + yOffset, arrow.position.z + zOffset];
+    const arrowCameraTarget = [ arrow.position.x, arrow.position.y + yOffset, arrow.position.z + zOffset + 1 ];
+
+    arrowCamera = new THREE.PerspectiveCamera(2*fov, aspect, near, far);
 
     arrowCamera.position.set( ...arrowCameraPosition );
     arrowCamera.lookAt( ...arrowCameraTarget );
@@ -445,6 +564,7 @@ function buildCameras() {
     cameras = [thirdPersonCamera, firstPersonCamera];
 }
 
+// Lights
 function createDirectionalLight() {
     light = new THREE.DirectionalLight( lightColor, lightIntensity );
     light.position.set( ...lightPosition );
@@ -479,6 +599,7 @@ function buildLight() {
     createAmbientLight();
 }
 
+// Ground
 function buildGround() {
     var groundTexture = textureLoader.load( '../assets/textures/grass_texture.png' );
     groundTexture.wrapS = groundTexture.wrapT = THREE.RepeatWrapping;
@@ -502,40 +623,25 @@ function buildGround() {
 // HANDLING FUNCTIONS
 // ============================================================================
 
-function initGUI() {
-    // Hide game menu
-    document.querySelector( '#gameMenu' ).style.display = 'none';
-
-    // Show loading screen
-    document.querySelector( '#loadingScreen' ).style.display = 'block';
-
-    // Hide pauseScreen
-    document.querySelector( '#pauseScreen' ).style.display = 'none';
-
-    // Hide crosshair
-    document.querySelector( '#crosshair' ).style.display = 'none';
-}
 
 function switchCamera() {
-
-    if ( gameState.arrowFlying ) {
-        return;
-    }
+    
+    if (gameState.gamePaused) return;
+    if (gameState.arrowFlying) return;
 
     currentCameraIdx = (currentCameraIdx + 1) % cameras.length;
     currentCamera = cameras[currentCameraIdx];
 
     if ( currentCamera === firstPersonCamera ) {
-        var crosshair = document.getElementById( 'crosshair' );
-        crosshair.style.display = 'block';
+        document.querySelector( '#crosshair' ).hidden = false;
     } else {
-        var crosshair = document.getElementById( 'crosshair' );
-        crosshair.style.display = 'none';
+        document.querySelector( '#crosshair' ).hidden = true;
     }
 }
 
 function setCameraControls() {
     var onKeyDown = function( event ) {
+
         switch (  event.keyCode ) {
             case 81: // q
                 switchCamera();
@@ -547,9 +653,9 @@ function setCameraControls() {
     gameControls.push(playerControls);
 }
 
-function setPlayerControls() {
+function setLinkMovementControls() {
 
-    const link = modelsMap.link.root;
+    const link = models.link.root;
     playerControls = new MovementPointerLockControls( link, document.body );
     
     playerControls.enableMouseVertical = false;
@@ -619,32 +725,39 @@ function setPlayerControls() {
     gameControls.push(playerControls);
 }
 
-function setBowControls() {
+function setLinkAimControls() {
 
-    const link = modelsMap.link;
+    const link = models.link;
+    
     const armL = link.joints.upper.left.arm;
     const armR = link.joints.upper.right.arm;
+
     const head = link.joints.upper.head;
 
     // Controls for left and right arm (and bow)
-    var bowControlsL = new AimPointerLockControls( armL, document.body );
-    var bowControlsR = new AimPointerLockControls( armR, document.body );
-    bowControlsR.inverted = true;
+    var bowControlsArmL = new AimPointerLockControls( armL, document.body );
+    var bowControlsArmR = new AimPointerLockControls( armR, document.body );
     
     // Controls for link's head
     var headControls = new HeadPointerLockControls( head, document.body, )
+
+    // Settings
+    bowControlsArmR.inverted = true;
+    bowControlsArmR.correctX = true;
+    bowControlsArmR.correction = 0.002;
+
+    headControls.increment = 0.05;
     
-    var bowControlsArray = [bowControlsL, bowControlsR];
-
     // Assign listeners
-    bowControlsArray.forEach(bowControls => {
-        bowControls.minPolarAngle = 0.25 * Math.PI;
-        bowControls.maxPolarAngle = 0.75 * Math.PI;
+    bowControlsArmL.minPolarAngle = -0.75 * Math.PI;
+    bowControlsArmL.maxPolarAngle = -0.25 * Math.PI;
+    gameControls.push(bowControlsArmL);
 
-        gameControls.push(bowControls);
-    });
+    bowControlsArmR.minPolarAngle = 0.25 * Math.PI;
+    bowControlsArmR.maxPolarAngle = 0.75 * Math.PI;
+    gameControls.push(bowControlsArmR);
 
-    headControls.minPolarAngle = -0.25 * Math.PI;
+    headControls.minPolarAngle = -0.1 * Math.PI;
     headControls.maxPolarAngle = 0.25 * Math.PI;
     gameControls.push(headControls);
 }
@@ -667,7 +780,7 @@ function setShootControls () {
 
         gameState.shooting = true;
         gameState.shootInitTime = performance.now();
-        nockArrow();
+        startNockingArrowAnimation();
     };
 
     var onClickRelease = function (event) {
@@ -686,8 +799,6 @@ function setShootControls () {
 }
 
 function setListeners(controls) {
-    var pauseScreen = document.getElementById( 'pauseScreen' );
-
     pauseScreen.addEventListener( 'click', function () {
 
         controls.lock();
@@ -695,22 +806,20 @@ function setListeners(controls) {
     }, false );
 
     controls.addEventListener( 'lock', function () {
-
-        pauseScreen.style.display = 'none';
+        document.querySelector( '#pauseScreen' ).hidden = true;
         gameState.gamePaused = false;
     } );
 
     controls.addEventListener( 'unlock', function () {
-
-        pauseScreen.style.display = 'block';
+        document.querySelector( '#pauseScreen' ).hidden = false;
         gameState.gamePaused = true;
     } );
 }
 
 function setControls() {
     // setOrbitControls();
-    setPlayerControls();
-    setBowControls();
+    setLinkMovementControls();
+    setLinkAimControls();
     setShootControls();
     setCameraControls();
 
@@ -721,7 +830,6 @@ function setControls() {
     );
 
     gameState.controlsSet = true;
-    main();
 }
 
 function lockControls() {
@@ -742,23 +850,48 @@ function onWindowResize() {
 // ANIMATION FUNCTIONS
 // ============================================================================
 
-function nockArrow() {
-    const link = modelsMap.link.root;
-    const bowString = link.getObjectByName('string');
-    const arrow = modelsMap.arrow.root;
-    
-    const stringPosition = bowString.position.z;
+function startNockingArrowAnimation() {
+    const link = models.link;
+    const arrow = models.arrow.root;
+
+    const bowString = models.bow.joints.string;
+    const spine001 = link.joints.upper.spine001;
+    const spine002 = link.joints.upper.spine002;
+    const spine003 = link.joints.upper.spine003;
+    const armL = link.joints.upper.left.arm;
+    const armR = link.joints.upper.right.arm;
+    const forearmR = link.joints.upper.right.forearm;
+    const head = link.joints.upper.head;
+
+    // Recording initial position
+    const spine001Angle = spine001.rotation.y;
+    const spine002Angle = spine002.rotation.y;
+    const spine003Angle = spine003.rotation.y;
+    const armLAngle = armL.rotation.y;
+    const armRAngle = armR.rotation.y;
+    const forearmRAngle = forearmR.rotation.y;
+    const headAngle = head.rotation.y;
+
     const arrowPosition = arrow.position.z;
 
-    var delta = { dz: 0.0 };
+    var delta = { dz: 0.0, dAngle: 0.0 };
     nockTween = new TWEEN.Tween( delta )
-    .to({dz: bowStringMaxStretching}, 1000*maxCharge)
+    .to({dz: bowStringMaxStretching, dAngle: 0.2*Math.PI}, 1000*maxCharge)
     .easing(TWEEN.Easing.Quadratic.In)
     .onUpdate(
         () => {
-            bowString.position.z = stringPosition - delta.dz;
             arrow.position.z = arrowPosition - delta.dz;
             nockingAmount = delta.dz;
+
+            spine001.rotation.y = spine001Angle - delta.dAngle;
+            spine002.rotation.y = spine002Angle - delta.dAngle;
+            spine003.rotation.y = spine003Angle - delta.dAngle;
+
+            armR.rotation.y = armRAngle + delta.dAngle;
+            forearmR.rotation.y = forearmRAngle + delta.dAngle;
+
+            armL.rotation.y = armLAngle + 3*delta.dAngle;
+            head.rotation.y = headAngle + 3*delta.dAngle;
         }
     )
     .onComplete(
@@ -770,10 +903,7 @@ function nockArrow() {
 }
 
 function computeArrowDirection() {
-    // World axis: 
-    // links rotation (x axis)
-    // arrow up/down (y axis)
-    const arrow = modelsMap.arrow.root;
+    const arrow = models.arrow.root;
     
     var dir = new THREE.Vector3();
     arrow.getWorldDirection(dir);
@@ -790,19 +920,34 @@ function computeArrowInitialVelocity(direction) {
     return initialVelocity;
 }
 
-function initLinkLowerLimbs() {
-    const linkJoints = modelsMap.link.joints;
+function restoreLinkLowerLimbs() {
+    const linkJoints = models.link.joints;
 
-    // Set initial position for lower limbs
-    linkJoints.lower.left.thigh.rotation.x = UTILS.degToRad(180);
-    linkJoints.lower.left.shin.rotation.x = 0.0;
-    // linkJoints.lower.left.foot.rotation.x = 0.0;
-    // linkJoints.lower.left.toe.rotation.x = 0.0;
-    
-    linkJoints.lower.right.thigh.rotation.x = UTILS.degToRad(180);
-    linkJoints.lower.right.shin.rotation.x = 0.0;
-    // linkJoints.lower.right.foot.rotation.x = 0.0;
-    // linkJoints.lower.right.toe.rotation.x = 0.0;
+    linkJoints.lower.left.thigh.rotation.copy(linkRestJoints.lower.left.thigh);
+    linkJoints.lower.left.shin.rotation.copy(linkRestJoints.lower.left.shin);
+    linkJoints.lower.right.thigh.rotation.copy(linkRestJoints.lower.right.thigh);
+    linkJoints.lower.right.shin.rotation.copy(linkRestJoints.lower.right.shin);
+}
+
+function restoreLinkUpperLimbs() {
+    const link = models.link;
+
+    const spine001 = link.joints.upper.spine001;
+    const spine002 = link.joints.upper.spine002;
+    const spine003 = link.joints.upper.spine003;
+    const armL = link.joints.upper.left.arm;
+    const armR = link.joints.upper.right.arm;
+    const forearmR = link.joints.upper.right.forearm;
+    const head = link.joints.upper.head;
+
+    spine001.rotation.copy(linkRestJoints.upper.spine001);
+    spine002.rotation.copy(linkRestJoints.upper.spine002);
+    spine003.rotation.copy(linkRestJoints.upper.spine003);
+    head.rotation.copy(linkRestJoints.upper.head);
+
+    armL.rotation.copy(linkRestJoints.upper.left.arm);
+    armR.rotation.copy(linkRestJoints.upper.right.arm);
+    forearmR.rotation.copy(linkRestJoints.upper.right.forearm);
 }
 
 function animateLinkMovement(time) {
@@ -837,7 +982,7 @@ function animateLinkMovement(time) {
     // Stop animation if no movement
     if ( (Math.abs(linkVelocity.z) < movThreshold) && (Math.abs(linkVelocity.x) < movThreshold) ) {
         stopLinkWalkAnimation();
-        initLinkLowerLimbs();
+        restoreLinkLowerLimbs();
     }
 
     // Update vertical position
@@ -855,12 +1000,12 @@ function animateLinkMovement(time) {
 }
 
 function startLinkWalkAnimation() {
-    const linkJoints = modelsMap.link.joints;
+    const linkJoints = models.link.joints;
 
     // Set initial position for lower limbs
     if ( linkMovementTweens.length != 0 ) return;
     
-    initLinkLowerLimbs();
+    restoreLinkLowerLimbs();
 
     // Params
     const time1 = 200;
@@ -975,12 +1120,14 @@ function stopLinkWalkAnimation() {
 
 function startArrowAnimation() {    
     console.log("Arrow shot!");
-    const link = modelsMap.link.root;
-    var bow = link.getObjectByName('Bow');
-    const bowString = link.getObjectByName('string');
-    const arrow = modelsMap.arrow.root;
 
-    SceneUtils.detach(arrow, bow, scene);
+    const bow = models.bow.root;
+    const handR = models.link.joints.upper.right.hand;
+    const bowString = models.bow.joints.string;
+    const arrow = models.arrow.root;
+
+    bow.attach(bowString);
+    scene.attach(arrow);
 
     // Compute arrow trajectory
     var dir = computeArrowDirection();
@@ -992,13 +1139,9 @@ function startArrowAnimation() {
     // Initial velocity
     var arrowInitialVelocity = computeArrowInitialVelocity(dir);
 
-    // console.log("Initial position: " + UTILS.vec3ToArr(arrowInitialPosition));
-    // console.log("Initial velocity: " + UTILS.vec3ToArr(arrowInitialVelocity));
-
     arrowVelocity.copy(arrowInitialVelocity);
 
     // Create tween to shoot arrow
-    const stringPosition = bowString.position.z;
     const arrowPosition = arrow.position.z;
     
     var delta = {dz: nockingAmount};
@@ -1007,7 +1150,6 @@ function startArrowAnimation() {
     .easing(TWEEN.Easing.Quadratic.Out)
     .onUpdate(
         () => {
-            bowString.position.z = stringPosition + (nockingAmount - delta.dz);
             arrow.position.z = arrowPosition + (nockingAmount - delta.dz);
         }
     )
@@ -1017,6 +1159,8 @@ function startArrowAnimation() {
             gameState.arrowFlying = true;
 
             currentCamera = arrowCamera;
+            handR.attach(bowString);
+            restoreLinkUpperLimbs();
         }
     );
     
@@ -1026,27 +1170,27 @@ function startArrowAnimation() {
 
 function animateArrowFlight(time) {
     var dt = ( time - prevTime ) / 1000;
+    const groundLevel = 2.0;
 
-    const arrow = modelsMap.arrow.root;
+    const arrow = models.arrow.root;
     arrowVelocity.addScaledVector(arrowAcceleration, dt);
     
     arrowDirection.copy(arrowVelocity)
     arrowDirection.normalize();
     arrow.position.addScaledVector(arrowVelocity, 5*dt);
 
-    arrow.rotateX(Math.PI * Math.abs(arrowDirection.y) * 0.5*dt);
+    arrow.rotateX(Math.PI * Math.abs(arrowDirection.y) * 0.5 * dt);
     
-    if ( arrow.position.y < 0 ) {
+    if ( arrow.position.y < groundLevel ) {
         stopArrowFlight();
     }
 }
 
 function repositionArrow() {
-    const arrow = modelsMap.arrow.root;
-    var bow = modelsMap.bow.root;
+    const arrow = models.arrow.root;
+    var bow = models.bow.root;
 
-    scene.remove(arrow);
-    bow.add(arrow);
+    bow.attach(arrow);
 
     arrow.position.x = 0.0;
     arrow.position.y = 0.0;
@@ -1085,37 +1229,43 @@ function render(time) {
         if ( gameState.arrowFlying ) {
             animateArrowFlight(time);
         }
+    
+        prevTime = time;
+        renderer.render(scene, currentCamera);
     }
-    
-    prevTime = time;
-    
-    renderer.render(scene, currentCamera);
     requestAnimationFrame(render);
 }
 
 export function main() {
-    initGUI();
+    if ( !gameState.optionsSet ) {
+        setOptions();
+        main();
+    }
 
-    if (!gameState.modelsLoaded) {
+    if ( !gameState.guiInitialized ) {
+        initGUI();
+        main();
+    }
+
+    if ( !gameState.modelsLoaded ) {
         loadAssets();
         return;
+        // main();
     }
     
-    if (!gameState.sceneBuilt) {
-        init();
+    if ( !gameState.sceneBuilt ) {
+        initWebGL();
         buildScene();
-        return;
+        main();
     }
 
-    if (!gameState.controlsSet) {
+    if ( !gameState.controlsSet ) {
         setControls();
-        return;
-    }
-
-    if (gameState.controlsSet) {
+        main();
+    } else {
         lockControls();
+        gameState.canShoot = true;
     }
     
     requestAnimationFrame(render);
 }
-// main();

@@ -32,18 +32,47 @@
                         <h2>Link's Training</h2>
                     </div>
                 </div>
+
+                <div class="row p-3">
+                    <div class="col">
+                        <!-- <h4>Select difficulty</h4> -->
+                        <select class="custom-select mr-sm-2" id="difficultySelect">
+                            <option value="-1" selected>Choose difficulty...</option>
+                            <option value="easy">Easy</option>
+                            <option value="medium">Medium</option>
+                            <option value="hard">Hard</option>
+                          </select>
+                    </div>
+                </div>
+                
+                <div class="row p-3">
+                    <div class="col">
+                        <form id="daylightForm">
+                            <!-- <h4>Select day or night</h4> -->
+                            <div class="form-check form-check-inline">
+                                <input class="form-check-input" type="radio" id="daylightRadio" name="daylightRadio" value="day" checked>
+                                <label class="form-check-label" for="daylightRadio">Day</label>
+                            </div>
+                            <div class="form-check form-check-inline">
+                                <input class="form-check-input" type="radio" id="nightRadio" name="daylightRadio" value="night">
+                                <label class="form-check-label" for="nightRadio">Night</label>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+
+                <div class="row p-3">
+                    <div class="col">
+                        <button type="button" class="btn btn-info btn-lg" data-toggle="modal" data-target="#instructionsModal">Instructions</button>
+                    </div>
+                </div>
                 
                 <div class="row p-3">
                     <div class="col">
                         <button id="playButton" type="button" class="btn btn-success btn-lg">Play</button>
                     </div>
                 </div>
-                
-                <div class="row p-3">
-                    <div class="col">
-                        <button type="button" class="btn btn-info btn-lg" data-toggle="modal" data-target="#instructionsModal">Controls</button>
-                    </div>
-                </div>
+
             </div>
 
             <!-- Controls -->
@@ -51,14 +80,16 @@
                 <div class="modal-dialog">
                     <div class="modal-content">
                         <div class="modal-header">
-                            <h4 class="modal-title">Controls</h4>
+                            <h4 class="modal-title">Instructions</h4>
                             <button type="button" class="close" data-dismiss="modal">&times;</button>
                         </div>
                     <div class="modal-body">
                         <p>
+                            Help Link master his archery skill, by hitting the target with an arrow three times. Remember, gravity counts!
+                            <br/><br/>
                             Move: WASD<br/>
                             Aim: MOUSE<br/>
-                            Switch camera: Q
+                            Switch camera (first person, third person): Q
                         </p>
                     </div>
                     <div class="modal-footer">
@@ -69,10 +100,10 @@
             </div>
         </div>
         <!-- Loading and pause screen -->
-        <section id="loadingScreen" style="display: none;">
+        <div id="loadingScreen" hidden>
             <div id="loader"></div>
-        </section>
-        <div id="pauseScreen" style="display: none;">
+        </div>
+        <div id="pauseScreen" hidden>
 			<div id="instructions">
 				<span style="font-size:36px">Game paused. Click to play</span>
 				<br /><br />
@@ -85,7 +116,16 @@
         
         <script type="module">
             import {main} from "./js/main.js";
-            document.querySelector('#playButton').addEventListener('click', main);
+
+            document.querySelector('#playButton').addEventListener('click', function() {
+                var difficulty = $("#difficultySelect :selected").val(); 
+
+                if ( difficulty === "-1" ) {
+                    alert("Please select a difficulty!");
+                } else {
+                    main();
+                }
+            });
         </script>
 	</body>
 </html>

@@ -197,6 +197,12 @@ var AimPointerLockControls = function ( object, domElement ) {
 	this.minPolarAngle = 0; // radians
 	this.maxPolarAngle = Math.PI; // radians
     this.inverted = false;
+    this.increment = 0.002;
+
+    this.correction = 0.001;
+    this.correctX = false;
+    this.correctY = false;
+    this.correctZ = false;
     
     //
 	// internals
@@ -209,39 +215,44 @@ var AimPointerLockControls = function ( object, domElement ) {
 	var unlockEvent = { type: 'unlock' };
 
 	function onMouseMove( event ) {
+        const increment = scope.increment;
+        const correction = scope.correction;
 
         if ( scope.isLocked === false ) return;
 
 		var movementY = event.movementY || event.mozMovementY || event.webkitMovementY || 0;
 
         if ( scope.inverted ) {
-            // object.rotateZ(movementY * 0.002);
-            object.rotation.z += movementY * 0.002;
-            object.rotation.x += movementY * 0.001;
-            
-            object.rotation.z = Math.min(
-                scope.maxPolarAngle, 
-                Math.max(
-                    object.rotation.z,
-                    scope.minPolarAngle
-                )
-            );
-
-            if ( (object.rotation.z == scope.maxPolarAngle) || (object.rotation.z == scope.minPolarAngle) ) {
-                object.rotation.x -= movementY * 0.001;
-            }
+            object.rotation.z += movementY * increment;
         } else {
-            object.rotation.z -= movementY * 0.002;
-            object.rotation.z = -1 * Math.min(
-                scope.maxPolarAngle, 
-                Math.max(
-                    -1 * object.rotation.z,
-                    scope.minPolarAngle
-                )
-            );
+            object.rotation.z -= movementY * increment;
         }
+            
+        object.rotation.z = Math.min(
+            scope.maxPolarAngle, 
+            Math.max(
+                object.rotation.z,
+                scope.minPolarAngle
+            )
+        );
+
+        if ( object.rotation.z < scope.maxPolarAngle && object.rotation.z > scope.minPolarAngle) {
+            if (scope.correctX) {
+                var weight = Math.sin(object.rotation.z + scope.minPolarAngle);
+                object.rotation.x += movementY * correction * weight;
+            }
+            if (scope.correctY) {
+                var weight = Math.cos(object.rotation.z + scope.minPolarAngle);
+                object.rotation.y += movementY * correction;
+            }
+            if (scope.correctZ) {
+                object.rotation.z += movementY * correction;
+            }
+        }
+
 		scope.dispatchEvent( changeEvent );
-	}
+    }
+    
 
 	function onPointerlockChange() {
 
