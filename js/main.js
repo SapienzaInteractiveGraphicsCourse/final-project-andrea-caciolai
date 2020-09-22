@@ -128,21 +128,48 @@ const firstPersonCameraTarget = [ 2.0, 3.0, 1.0 ];
 
 const fogNear = 50;
 const fogFar = 1000;
-const fogColor = 0xcce0ff;
+const daylightBackgroundColor = 0xcce0ff;
+const nightBackgroundColor = 0x070B34;
+
+// Terrain parameters
+const terrainWidth = 500;
+const terrainTextureRepeat = 32;
+const terrainTextureAnisotropy = 16;
 
 // Light parameters
+
+// Directional light 
 const lightDistance = 200;
-const lightPosition = [ -0.5, 1, -2 ];
 const lightTarget = [ 0, 0, 0 ];
-const lightColor = 0xFFFFFFFF;
-const lightIntensity = 5;
+const sunlightColor = 0xfffeae;
+const sunlightIntensity = 10.0;
 
-const SHADOW_MAP_WIDTH = 2048; 
-const SHADOW_MAP_HEIGHT = 2048;
+const lightShadowMapWidth = 2048; 
+const lightShadowMapHeight = 2048;
 
-const shadowCameraWidth = 100;
-const shadowCameraHeight = 100;
-const shadowCameraDepth = 1000;
+const lightShadowCameraWidth = terrainWidth / 2;
+const lightShadowCameraHeight = terrainWidth / 2;
+const lightShadowCameraDepth = 1024;
+
+// Sun
+const sunRadius = 20;
+const sunWidthSegments = 12;
+const sunHeightSegments = 12;
+
+const sunPosition = [ 1, 0.5, -2 ];
+const sunColor = 0xfffeae;
+
+// Moon
+const moonPosition = [ 1, 0.2, 2 ];
+const moonColor = 0xe5e5e5;
+const moonlightColor = 0xe5e5e5;
+const moonlightIntensity = 2.0;
+
+// Ambient light
+const ambientDaylightColor = 0xFFFFFF;
+const ambientDaylightIntensity = 1;
+const ambientNightIntensity = 2;
+const ambientNightColor = 0x2B2F77;
 
 // Link movement variables and params
 var linkRestJoints = {
@@ -495,12 +522,17 @@ function buildArrow() {
 // Scene
 function buildScene() {
     scene = new THREE.Scene();
-    scene.background = new THREE.Color( fogColor );
 
-    buildLight();
+    if ( daylight === 'day' ) {
+        scene.background = new THREE.Color( daylightBackgroundColor );
+    } else {
+        scene.background = new THREE.Color( nightBackgroundColor );
+    }
+
+    createLights();
     // createFog();
 
-    buildGround();  
+    buildTerrain();  
     buildModels();
 
     buildCameras();
@@ -510,7 +542,7 @@ function buildScene() {
 }
 
 function createFog() {
-    scene.fog = new THREE.Fog( fogColor, fogNear, fogFar );
+    scene.fog = new THREE.Fog( daylightBackgroundColor, fogNear, fogFar );
 }
 
 // Cameras
@@ -565,58 +597,112 @@ function buildCameras() {
 }
 
 // Lights
-function createDirectionalLight() {
-    light = new THREE.DirectionalLight( lightColor, lightIntensity );
-    light.position.set( ...lightPosition );
+function createSun() {
+    
+    // Create the sun
+    const sphereGeometry = new THREE.SphereBufferGeometry(1, sunWidthSegments, sunHeightSegments);
+    
+    const sunMaterial = new THREE.MeshBasicMaterial({color: sunColor});
+    const sun = new THREE.Mesh(sphereGeometry, sunMaterial);
+    sun.scale.set(sunRadius, sunRadius, sunRadius); 
+
+    sun.position.set( ...sunPosition );
+    sun.position.multiplyScalar( lightDistance );
+
+    // Create the sunlight
+    light = new THREE.DirectionalLight( sunlightColor, sunlightIntensity );
+    light.position.set( ...sunPosition );
     light.position.multiplyScalar( lightDistance );
     light.target.position.set( ...lightTarget );
 
     light.castShadow = true;
 
-    light.shadow.camera.left = - shadowCameraWidth;
-    light.shadow.camera.right = shadowCameraWidth;
-    light.shadow.camera.top = shadowCameraHeight;
-    light.shadow.camera.bottom = - shadowCameraHeight;
+    light.shadow.camera.left = - lightShadowCameraWidth;
+    light.shadow.camera.right = lightShadowCameraWidth;
+    light.shadow.camera.top = lightShadowCameraHeight;
+    light.shadow.camera.bottom = - lightShadowCameraHeight;
     light.shadow.camera.near = 0.1;
-    light.shadow.camera.far = shadowCameraDepth;
+    light.shadow.camera.far = lightShadowCameraDepth;
 
-    light.shadow.mapSize.width = SHADOW_MAP_WIDTH;
-    light.shadow.mapSize.height = SHADOW_MAP_HEIGHT;
+    light.shadow.mapSize.width = lightShadowMapWidth;
+    light.shadow.mapSize.height = lightShadowMapHeight;
 
+    scene.add( sun );
     scene.add( light );
 }
 
-function createAmbientLight() {
-    const color = 0xFFFFFF;
-    const intensity = 1;
-    ambient = new THREE.AmbientLight(color, intensity);
+function createMoon() {
     
+    // Create the moon
+    const sphereGeometry = new THREE.SphereBufferGeometry(1, sunWidthSegments, sunHeightSegments);
+    
+    const moonMaterial = new THREE.MeshBasicMaterial({color: moonColor});
+    const moon = new THREE.Mesh(sphereGeometry, moonMaterial);
+    moon.scale.set(sunRadius, sunRadius, sunRadius); 
+
+    moon.position.set( ...moonPosition );
+    moon.position.multiplyScalar( lightDistance );
+
+    // Create the moonlight
+    var light = new THREE.DirectionalLight( moonlightColor, moonlightIntensity );
+    light.position.set( ...moonPosition );
+    light.position.multiplyScalar( lightDistance );
+    light.target.position.set( ...lightTarget );
+
+    light.castShadow = true;
+
+    light.shadow.camera.left = - lightShadowCameraWidth;
+    light.shadow.camera.right = lightShadowCameraWidth;
+    light.shadow.camera.top = lightShadowCameraHeight;
+    light.shadow.camera.bottom = - lightShadowCameraHeight;
+    light.shadow.camera.near = 0.1;
+    light.shadow.camera.far = lightShadowCameraDepth;
+
+    light.shadow.mapSize.width = lightShadowMapWidth;
+    light.shadow.mapSize.height = lightShadowMapHeight;
+
+    scene.add( moon );
+    scene.add( light );
+}
+
+
+function createAmbientDaylight() {
+    ambient = new THREE.AmbientLight(ambientDaylightColor, ambientDaylightIntensity);
     scene.add( ambient );
 }
 
-function buildLight() {
-    createDirectionalLight();
-    createAmbientLight();
+function createAmbientNightLight() {
+    ambient = new THREE.AmbientLight(ambientNightColor, ambientNightIntensity);
+    scene.add( ambient );
+}
+
+function createLights() {
+    if ( daylight === 'day' ) {
+        createSun();
+        createAmbientDaylight();
+    } else {
+        createMoon();
+        createAmbientNightLight();
+    }
 }
 
 // Ground
-function buildGround() {
-    var groundTexture = textureLoader.load( '../assets/textures/grass_texture.png' );
-    groundTexture.wrapS = groundTexture.wrapT = THREE.RepeatWrapping;
-    groundTexture.repeat.set( 32, 32 );
-    // groundTexture.repeat.set( 256, 256 );
-    groundTexture.anisotropy = 16;
-    groundTexture.encoding = THREE.sRGBEncoding;
-    groundTexture.magFilter = THREE.LinearFilter;
-    groundTexture.minFilter = THREE.LinearMipmapLinearFilter;
+function buildTerrain() {
+    var terrainTexture = textureLoader.load( '../assets/textures/grass_texture.png' );
+    terrainTexture.wrapS = terrainTexture.wrapT = THREE.RepeatWrapping;
+    terrainTexture.repeat.set( terrainTextureRepeat, terrainTextureRepeat );
+    terrainTexture.anisotropy = terrainTextureAnisotropy;
+    terrainTexture.encoding = THREE.sRGBEncoding;
+    terrainTexture.magFilter = THREE.LinearFilter;
+    terrainTexture.minFilter = THREE.LinearMipmapLinearFilter;
 
-    var groundMaterial = new THREE.MeshLambertMaterial( { map: groundTexture } );
+    var terrainMaterial = new THREE.MeshLambertMaterial( { map: terrainTexture } );
 
-    var mesh = new THREE.Mesh( new THREE.PlaneBufferGeometry( 1000, 1000 ), groundMaterial );
-    mesh.position.y = 0;
-    mesh.rotation.x = - Math.PI / 2;
-    mesh.receiveShadow = true;
-    scene.add( mesh );
+    var terrain = new THREE.Mesh( new THREE.PlaneBufferGeometry( terrainWidth, terrainWidth ), terrainMaterial );
+    terrain.position.y = 0;
+    terrain.rotation.x = - Math.PI / 2;
+    terrain.receiveShadow = true;
+    scene.add( terrain );
 }
 
 // ============================================================================
