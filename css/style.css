@@ -46,25 +46,25 @@ html, body {
 }
 
 .targetImg1 {
-    right: 240px;
+    left: 80px;
 }
 
 .targetImg2 {
-    right: 160px;
+    left: 160px;
 }
 
 .targetImg3 {
-    right: 80px;
+    left: 240px;
 }
 
-#pauseScreen {
+.midGameScreen {
     position: absolute;
     width: 100%;
     height: 100%;
     background-color: rgba(0,0,0,0.5);
 }
 
-#instructions {
+.midGameText {
     width: 100%;
     height: 100%;
 
@@ -87,7 +87,7 @@ html, body {
     color: #ffffff;
     text-align: center;
     font-family: Arial;
-    font-size: 14px;
+    font-size: 18px;
     line-height: 24px;
 
     cursor: pointer;

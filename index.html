@@ -111,14 +111,22 @@
         <div id="loadingScreen" hidden>
             <div id="loader"></div>
         </div>
-        <div id="pauseScreen" hidden>
-			<div id="instructions">
+        <div id="pauseScreen" class="midGameScreen" hidden>
+			<div id="instructions" class="midGameText">
 				<span style="font-size:36px">Game paused. Click to play</span>
 				<br /><br />
 				Move: WASD<br/>
                 Aim: MOUSE<br/>
                 Switch camera: Q
 			</div>
+        </div>
+
+        <!-- Game over screen -->
+        <div id="gameOverScreen" class="midGameScreen" hidden>
+            <div id="gameOverDiv" class="midGameText">
+                <span style="font-size:36px">GAME OVER</span>
+                <br /><br />
+            </div>
         </div>
 
         <!-- HUD for hit/miss -->

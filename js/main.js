@@ -19,6 +19,7 @@ var loadingManager;
 // Game state
 var gameState = {
     gamePaused: false,
+    gameOver: false,
     optionsSet: false,
     guiInitialized: false,
     modelsLoaded: false,
@@ -245,6 +246,10 @@ const arrowForce = 10.0;
 const arrowMass = 1.0; 
 const maxCharge = 2.0;
 
+var arrowHits = 0;
+var arrowShots = 0;
+
+const maxShots = 3;
 
 // ============================================================================
 // INITIALIZATION FUNCTIONS
@@ -758,8 +763,44 @@ function handleLinkCollision(collidedObject) {
 function handleArrowCollision(collidedObject) {
     if ( gameState.arrowFlying ) {
         console.log("Target hit!");
+        registerArrowHit();
         stopArrowFlight();
     }
+}
+
+function registerArrowHit() {
+    arrowHits += 1;
+    arrowShots += 1;
+
+    var imgName = "hitImg" + arrowShots;
+    document.querySelector("#"+imgName).style.visibility = "visible";
+}
+
+function registerArrowMiss() {
+    arrowShots += 1;
+
+    var imgName = "missImg" + arrowShots;
+    document.querySelector("#"+imgName).style.visibility = "visible";
+}
+
+function checkGameOver() {
+    if ( arrowShots >= maxShots ) {
+        console.log("GAME OVER!");
+        gameOver();
+    }
+}
+
+function gameOver() {
+    gameState.gameOver = true;
+
+    var gameOverDiv = document.querySelector("#gameOverDiv");
+    gameOverDiv.innerHTML += "You hit the target " + arrowHits + "/" + arrowShots + " times.<br/><br/>Reload the page to play again!"  
+
+    document.querySelector("#gameOverScreen").hidden = false;
+
+    gameControls.forEach((controls) => {
+        controls.unlock();
+    });
 }
 
 function setCollider(object, collidableObjects, handleCollisionCallback) {
@@ -854,7 +895,8 @@ function setLinkMovementControls() {
     playerControls.enableMouseVertical = false;
 
     var onKeyDown = function ( event ) {
-
+        if ( gameState.gameOver ) return;
+        if ( gameState.gamePaused ) return;
         switch ( event.keyCode ) {
 
             case 38: // up
@@ -885,7 +927,8 @@ function setLinkMovementControls() {
     };
 
     var onKeyUp = function ( event ) {
-
+        if ( gameState.gamePaused ) return;
+        if ( gameState.gamePaused ) return;
         switch ( event.keyCode ) {
 
             case 38: // up
@@ -994,18 +1037,24 @@ function setShootControls () {
 function setListeners(controls) {
     pauseScreen.addEventListener( 'click', function () {
 
-        controls.lock();
+        if ( !gameState.gameOver ) {
+            controls.lock();
+        }
 
     }, false );
 
     controls.addEventListener( 'lock', function () {
-        document.querySelector( '#pauseScreen' ).hidden = true;
-        gameState.gamePaused = false;
+        if ( !gameState.gameOver ) {
+            document.querySelector( '#pauseScreen' ).hidden = true;
+            gameState.gamePaused = false;
+        }
     } );
 
     controls.addEventListener( 'unlock', function () {
-        document.querySelector( '#pauseScreen' ).hidden = false;
-        gameState.gamePaused = true;
+        if ( !gameState.gameOver ) {
+            document.querySelector( '#pauseScreen' ).hidden = false;
+            gameState.gamePaused = true;
+        }
     } );
 }
 
@@ -1385,6 +1434,7 @@ function animateArrowFlight(time) {
     arrow.rotateX(Math.PI * Math.abs(arrowDirection.y) * 0.5 * dt);
     
     if ( arrow.position.y < groundLevel ) {
+        registerArrowMiss();
         stopArrowFlight();
     }
 }
@@ -1410,21 +1460,6 @@ function buildNewArrow() {
     setArrowCollider();
 }
 
-function repositionArrow() {
-    const arrow = models.arrow.root;
-    var bow = models.bow.root;
-    
-    bow.attach(arrow);
-
-    arrow.position.x = 0.0;
-    arrow.position.y = 0.0;
-    arrow.position.z = 0.0;
-
-    arrow.rotation.x = 0.0;
-    arrow.rotation.y = 0.0;
-    arrow.rotation.z = 0.0;
-}
-
 function stopArrowFlight() {
     gameState.arrowFlying = false;
 
@@ -1435,9 +1470,10 @@ function stopArrowFlight() {
     .onComplete(
         () => {
             currentCamera = cameras[currentCameraIdx];
-            // repositionArrow();
             buildNewArrow();
             gameState.canShoot = true;
+            
+            checkGameOver();
         })
     .start();
 }
