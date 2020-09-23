@@ -120,7 +120,7 @@ loadModelsList = [models.link, models.target, models.arrow];
 
 // Camera parameters
 const fov = 45;
-const aspect = window.innerWidth / window.innerHeight;  // the canvas default
+const aspect = window.innerWidth / window.innerHeight; 
 const near = 0.1;
 const far = 100000;
 
@@ -242,7 +242,7 @@ var nockTween;
 var nockingAmount;
 
 const bowStringMaxStretching = 10.0;
-const arrowForce = 10.0;
+const arrowForce = 20.0;
 const arrowMass = 1.0; 
 const maxCharge = 2.0;
 
@@ -250,6 +250,9 @@ var arrowHits = 0;
 var arrowShots = 0;
 
 const maxShots = 3;
+
+// Target movement
+var targetMovementTweens = [];
 
 // ============================================================================
 // INITIALIZATION FUNCTIONS
@@ -298,9 +301,6 @@ function setOptions() {
     difficulty = $("#difficultySelect :selected").val(); 
     daylight = $('input[name=daylightRadio]:checked', '#daylightForm').val()
 
-    // console.log(difficulty);
-    // console.log(daylight);
-
     gameState.optionsSet = true;
 }
 
@@ -314,7 +314,7 @@ function loadModels() {
         document.querySelector('#loadingScreen').classList.add( 'fade-out' );
         
         document.querySelector('#scoreImg').hidden = false;
-        
+
         gameState.modelsLoaded = true;
         main();
     };
@@ -723,6 +723,58 @@ function buildTerrain() {
 // HANDLING FUNCTIONS
 // ============================================================================
 
+// Game state handling
+function checkGameOver() {
+    if ( arrowShots >= maxShots ) {
+        console.log("GAME OVER!");
+        gameOver();
+    }
+}
+
+function gameOver() {
+    gameState.gameOver = true;
+
+    // Unlock game controls
+    gameControls.forEach((controls) => {
+        controls.unlock();
+    });
+
+    // Stop all tweens
+    UTILS.stopTweens(linkMovementTweens);
+    UTILS.stopTweens(targetMovementTweens);
+    nockTween.stop();
+
+    // Show game over screen
+    var gameOverDiv = document.querySelector("#gameOverDiv");
+    gameOverDiv.innerHTML += "You hit the target " + arrowHits + "/" + arrowShots + " times.<br/><br/>Reload the page to play again!"  
+
+    document.querySelector("#gameOverScreen").hidden = false;
+}
+
+function unpauseGame() {
+    document.querySelector( '#pauseScreen' ).hidden = true;
+    gameState.gamePaused = false;
+
+    UTILS.resumeTweens(linkMovementTweens);
+    UTILS.resumeTweens(targetMovementTweens);
+    if (nockTween !== undefined ) {
+        nockTween.resume();        
+    }
+}
+
+function pauseGame() {
+    document.querySelector( '#pauseScreen' ).hidden = false;
+    gameState.gamePaused = true;
+
+    UTILS.pauseTweens(linkMovementTweens);
+    UTILS.pauseTweens(targetMovementTweens);
+    
+    if (nockTween !== undefined ) {
+        nockTween.pause();        
+    }
+}
+
+// Collisions
 function handleLinkCollision(collidedObject) {
     const link = models.link.root
     const linkPosition = link.position;
@@ -744,20 +796,16 @@ function handleLinkCollision(collidedObject) {
     if ( Math.abs(displacement.x) > eps ) {
         // Left/Right collision
         if ( displacement.x >= 0 ) {
-            // console.log("Link collision right!");
             linkCollision.right = true;
         } else {
-            // console.log("Link collision left!");
             linkCollision.left = true;
         }
     }
     if ( Math.abs(displacement.z) >= eps ) {
         // Forward/Backward collision
         if ( displacement.z >= 0 ) {
-            // console.log("Link collision forward!");
             linkCollision.forward = true;
         } else {
-            // console.log("Link collision backward!");
             linkCollision.backward = true;
         }
     }
@@ -768,6 +816,8 @@ function handleArrowCollision(collidedObject) {
         console.log("Target hit!");
         registerArrowHit();
         stopArrowFlight();
+
+        models.target.root.attach( models.arrow.root );
     }
 }
 
@@ -784,26 +834,6 @@ function registerArrowMiss() {
 
     var imgName = "missImg" + arrowShots;
     document.querySelector("#"+imgName).style.visibility = "visible";
-}
-
-function checkGameOver() {
-    if ( arrowShots >= maxShots ) {
-        console.log("GAME OVER!");
-        gameOver();
-    }
-}
-
-function gameOver() {
-    gameState.gameOver = true;
-
-    var gameOverDiv = document.querySelector("#gameOverDiv");
-    gameOverDiv.innerHTML += "You hit the target " + arrowHits + "/" + arrowShots + " times.<br/><br/>Reload the page to play again!"  
-
-    document.querySelector("#gameOverScreen").hidden = false;
-
-    gameControls.forEach((controls) => {
-        controls.unlock();
-    });
 }
 
 function setCollider(object, collidableObjects, handleCollisionCallback) {
@@ -861,6 +891,7 @@ function checkCollisions() {
     models.arrow.collider();
 }
 
+// Controls
 function switchCamera() {
     
     if (gameState.gamePaused) return;
@@ -1039,25 +1070,17 @@ function setShootControls () {
 
 function setListeners(controls) {
     pauseScreen.addEventListener( 'click', function () {
-
-        if ( !gameState.gameOver ) {
-            controls.lock();
-        }
+        
+        if ( !gameState.gameOver ) { controls.lock(); }
 
     }, false );
 
     controls.addEventListener( 'lock', function () {
-        if ( !gameState.gameOver ) {
-            document.querySelector( '#pauseScreen' ).hidden = true;
-            gameState.gamePaused = false;
-        }
-    } );
+        if ( !gameState.gameOver ) { unpauseGame(); }
+    });
 
     controls.addEventListener( 'unlock', function () {
-        if ( !gameState.gameOver ) {
-            document.querySelector( '#pauseScreen' ).hidden = false;
-            gameState.gamePaused = true;
-        }
+        if ( !gameState.gameOver ) { pauseGame(); }
     } );
 }
 
@@ -1087,6 +1110,7 @@ function lockControls() {
     );
 }
 
+// Renderer callbacks
 function onWindowResize() {
     thirdPersonCamera.aspect = window.innerWidth / window.innerHeight;
     thirdPersonCamera.updateProjectionMatrix();
@@ -1097,76 +1121,8 @@ function onWindowResize() {
 // ANIMATION FUNCTIONS
 // ============================================================================
 
-function startNockingArrowAnimation() {
-    const link = models.link;
-    const arrow = models.arrow.root;
 
-    const bowString = models.bow.joints.string;
-    const spine001 = link.joints.upper.spine001;
-    const spine002 = link.joints.upper.spine002;
-    const spine003 = link.joints.upper.spine003;
-    const armL = link.joints.upper.left.arm;
-    const armR = link.joints.upper.right.arm;
-    const forearmR = link.joints.upper.right.forearm;
-    const head = link.joints.upper.head;
-
-    // Recording initial position
-    const spine001Angle = spine001.rotation.y;
-    const spine002Angle = spine002.rotation.y;
-    const spine003Angle = spine003.rotation.y;
-    const armLAngle = armL.rotation.y;
-    const armRAngle = armR.rotation.y;
-    const forearmRAngle = forearmR.rotation.y;
-    const headAngle = head.rotation.y;
-
-    const arrowPosition = arrow.position.z;
-
-    var delta = { dz: 0.0, dAngle: 0.0 };
-    nockTween = new TWEEN.Tween( delta )
-    .to({dz: bowStringMaxStretching, dAngle: 0.2*Math.PI}, 1000*maxCharge)
-    .easing(TWEEN.Easing.Quadratic.In)
-    .onUpdate(
-        () => {
-            arrow.position.z = arrowPosition - delta.dz;
-            nockingAmount = delta.dz;
-
-            spine001.rotation.y = spine001Angle - delta.dAngle;
-            spine002.rotation.y = spine002Angle - delta.dAngle;
-            spine003.rotation.y = spine003Angle - delta.dAngle;
-
-            armR.rotation.y = armRAngle + delta.dAngle;
-            forearmR.rotation.y = forearmRAngle + delta.dAngle;
-
-            armL.rotation.y = armLAngle + 3*delta.dAngle;
-            head.rotation.y = headAngle + 3*delta.dAngle;
-        }
-    )
-    .onComplete(
-        () => {
-            console.log("Max nocking!");
-        }
-    )
-    .start();
-}
-
-function computeArrowDirection() {
-    const arrow = models.arrow.root;
-    
-    var dir = new THREE.Vector3();
-    arrow.getWorldDirection(dir);
-    return dir;
-}
-
-function computeArrowInitialVelocity(direction) {
-    var charge = (gameState.shootFinalTime - gameState.shootInitTime) * 0.001;
-    var deltaT = Math.min(charge, maxCharge);
-
-    var impulse = arrowForce * deltaT;
-    var initialSpeed = impulse / arrowMass;
-    var initialVelocity = direction.multiplyScalar(initialSpeed);
-    return initialVelocity;
-}
-
+// Link
 function restoreLinkLowerLimbs() {
     const linkJoints = models.link.joints;
 
@@ -1373,6 +1329,76 @@ function stopLinkWalkAnimation() {
     linkMovementTweens = [];
 }
 
+// Arrow
+function startNockingArrowAnimation() {
+    const link = models.link;
+    const arrow = models.arrow.root;
+
+    const spine001 = link.joints.upper.spine001;
+    const spine002 = link.joints.upper.spine002;
+    const spine003 = link.joints.upper.spine003;
+    const armL = link.joints.upper.left.arm;
+    const armR = link.joints.upper.right.arm;
+    const forearmR = link.joints.upper.right.forearm;
+    const head = link.joints.upper.head;
+
+    // Recording initial position
+    const spine001Angle = spine001.rotation.y;
+    const spine002Angle = spine002.rotation.y;
+    const spine003Angle = spine003.rotation.y;
+    const armLAngle = armL.rotation.y;
+    const armRAngle = armR.rotation.y;
+    const forearmRAngle = forearmR.rotation.y;
+    const headAngle = head.rotation.y;
+
+    const arrowPosition = arrow.position.z;
+
+    var delta = { dz: 0.0, dAngle: 0.0 };
+    nockTween = new TWEEN.Tween( delta )
+    .to({dz: bowStringMaxStretching, dAngle: 0.2*Math.PI}, 1000*maxCharge)
+    .easing(TWEEN.Easing.Quadratic.In)
+    .onUpdate(
+        () => {
+            arrow.position.z = arrowPosition - delta.dz;
+            nockingAmount = delta.dz;
+
+            spine001.rotation.y = spine001Angle - delta.dAngle;
+            spine002.rotation.y = spine002Angle - delta.dAngle;
+            spine003.rotation.y = spine003Angle - delta.dAngle;
+
+            armR.rotation.y = armRAngle + delta.dAngle;
+            forearmR.rotation.y = forearmRAngle + delta.dAngle;
+
+            armL.rotation.y = armLAngle + 3*delta.dAngle;
+            head.rotation.y = headAngle + 3*delta.dAngle;
+        }
+    )
+    .onComplete(
+        () => {
+            console.log("Max nocking!");
+        }
+    )
+    .start();
+}
+
+function computeArrowDirection() {
+    const arrow = models.arrow.root;
+    
+    var dir = new THREE.Vector3();
+    arrow.getWorldDirection(dir);
+    return dir;
+}
+
+function computeArrowInitialVelocity(direction) {
+    var charge = (gameState.shootFinalTime - gameState.shootInitTime) * 0.001;
+    var deltaT = Math.min(charge, maxCharge);
+
+    var impulse = arrowForce * deltaT;
+    var initialSpeed = impulse / arrowMass;
+    var initialVelocity = direction.multiplyScalar(initialSpeed);
+    return initialVelocity;
+}
+
 function startArrowAnimation() {    
     console.log("Arrow shot!");
 
@@ -1481,6 +1507,62 @@ function stopArrowFlight() {
     .start();
 }
 
+// Target
+function startTargetAnimation() {
+    switch (difficulty) {
+        case "easy":
+            console.log("Difficulty selected: easy. Target is still.")
+            startTargetEasyAnimation();
+            break;
+        case "medium":
+            console.log("Difficulty selected: medium. Starting target movement.")
+            startTargetMediumAnimation();
+            break;
+        case "hard":
+            console.log("Difficulty selected: hard. Starting target movement.")
+            startTargetHardAnimation();
+            break;
+    }
+}
+
+function startTargetEasyAnimation() {}
+
+function startTargetMediumAnimation() {
+    const xLimit = 0.1 * terrainWidth;
+    const targetTime = 5 * 1000;
+    const target = models.target.root;
+
+    var targetPosition = {x: target.position.x};
+
+    var targetTween1 = new TWEEN.Tween(models.target.root.position)
+    .to({x: -1.0*xLimit}, 0.5 * targetTime);
+
+    var targetTween2 = new TWEEN.Tween(models.target.root.position)
+    .to({x: 1.0*xLimit}, targetTime);
+    
+    var targetTween3 = new TWEEN.Tween(models.target.root.position)
+    .to({x: 0.0}, 0.5 * targetTime);
+
+    // Chaining (infinite loop)
+
+    targetTween1.chain(targetTween2);
+    targetTween2.chain(targetTween3);
+    targetTween3.chain(targetTween1);
+
+    // Start
+    targetMovementTweens.push(targetTween1);
+    targetMovementTweens.push(targetTween2);
+    targetMovementTweens.push(targetTween3);
+
+    targetTween1.start();
+}
+
+function startTargetHardAnimation() {}
+
+function stopTargetAnimation() {
+    UTILS.stopTweens(targetMovementTweens);
+}
+
 // ============================================================================
 // RENDERING FUNCTIONS
 // ============================================================================
@@ -1499,6 +1581,7 @@ function render(time) {
         prevTime = time;
         renderer.render(scene, currentCamera);
     }
+
     requestAnimationFrame(render);
 }
 
@@ -1506,11 +1589,13 @@ export function main() {
     if ( !gameState.optionsSet ) {
         setOptions();
         main();
+        return;
     }
 
     if ( !gameState.guiInitialized ) {
         initLoadingScreen();
         main();
+        return;
     }
 
     if ( !gameState.modelsLoaded ) {
@@ -1523,13 +1608,18 @@ export function main() {
         initWebGL();
         buildScene();
         main();
+        return;
     }
 
     if ( !gameState.controlsSet ) {
         setControls();
         main();
+        return;
     } else {
+        // All is set
+        
         lockControls();
+        startTargetAnimation();
         gameState.canShoot = true;
     }
     

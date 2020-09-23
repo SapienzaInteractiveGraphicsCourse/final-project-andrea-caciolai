@@ -39,6 +39,7 @@ export function ArrToVec3(arr) {
 export function startTweens(tweens) {
     tweens.forEach(
         (tween) => {
+            if (tween === undefined ) return;
             tween.start();
         }
     );
@@ -47,6 +48,7 @@ export function startTweens(tweens) {
 export function pauseTweens(tweens) {
 	tweens.forEach( 
 		(tween) => {
+            if (tween === undefined ) return;
 			tween.pause();
 		} 
 	);
@@ -55,6 +57,7 @@ export function pauseTweens(tweens) {
 export function resumeTweens(tweens) {
 	tweens.forEach( 
 		(tween) => {
+            if (tween === undefined ) return;
 			tween.resume();
 		} 
 	);	
@@ -63,6 +66,7 @@ export function resumeTweens(tweens) {
 export function stopTweens(tweens) {
     tweens.forEach(
         (tween) => {
+            if (tween === undefined ) return;
             tween.stop();
         }
     );
