@@ -8,7 +8,7 @@
         
         <!-- CSS -->
         <link rel="stylesheet" type="text/css" href="css/style.css">
-        <link rel="icon" type="image/png" href="assets/favicon.png"/>
+        <link rel="icon" type="image/png" href="assets/images/favicon.png"/>
 
         <!-- LIBS -->
         <script src="lib/jquery-3.5.1.js"></script>
@@ -21,19 +21,22 @@
 	</head>
 	<body class="text-center">
         <!-- Image assets -->
-        <div id="crosshair" style="display: none;">
-            <img id="crosshair-img" src="./assets/crosshair.webp">
+        <div id="crosshair" hidden>
+            <img id="crosshair-img" src="./assets/images/crosshair.webp">
         </div>
 
         <!-- INTERFACE -->
         <div id="gameMenu" class="justify-content-center vertical-center">
+            <!-- Central box -->
             <div class="container" style="width: 400px;">
+                <!-- Title -->
                 <div class="row p-3">
                     <div class="col">
                         <h2>Link's Training</h2>
                     </div>
                 </div>
 
+                <!-- Difficulty -->
                 <div class="row p-3">
                     <div class="col">
                         <!-- <h4>Select difficulty</h4> -->
@@ -46,6 +49,7 @@
                     </div>
                 </div>
                 
+                <!-- Day/Night -->
                 <div class="row p-3">
                     <div class="col">
                         <form id="daylightForm">
@@ -62,12 +66,14 @@
                     </div>
                 </div>
 
+                <!-- Instructions -->
                 <div class="row p-3">
                     <div class="col">
                         <button type="button" class="btn btn-info btn-lg" data-toggle="modal" data-target="#instructionsModal">Instructions</button>
                     </div>
                 </div>
                 
+                <!-- Play button -->
                 <div class="row p-3">
                     <div class="col">
                         <button id="playButton" type="button" class="btn btn-success btn-lg">Play</button>
@@ -100,7 +106,8 @@
                 </div>
             </div>
         </div>
-        <!-- Loading and pause screen -->
+
+        <!-- Loading and pause screens -->
         <div id="loadingScreen" hidden>
             <div id="loader"></div>
         </div>
@@ -114,7 +121,21 @@
 			</div>
         </div>
 
-        
+        <!-- HUD for hit/miss -->
+        <div id="targetsDiv">
+            <div id="targetsHitDiv">
+                <img id="hitImg1" class="targetImg targetImg1" src="assets/images/target-hit.png">
+                <img id="hitImg2" class="targetImg targetImg2" src="assets/images/target-hit.png">
+                <img id="hitImg3" class="targetImg targetImg3" src="assets/images/target-hit.png">
+            </div>
+            <div id="targetsMissDiv">
+                <img id="missImg1" class="targetImg targetImg1" src="assets/images/target-miss.png">
+                <img id="missImg2" class="targetImg targetImg2" src="assets/images/target-miss.png">
+                <img id="missImg3" class="targetImg targetImg3" src="assets/images/target-miss.png">
+            </div>
+        </div>
+
+        <!-- Simple starter script -->
         <script type="module">
             import {main} from "./js/main.js";
 

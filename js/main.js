@@ -210,14 +210,21 @@ const linkMovementSpeed = 100.0;
 const linkMass = 100.0;
 
 const g = 9.81;
-const movThreshold = 0.01*linkMovementSpeed;
+const linkMovementThreshold = 0.01*linkMovementSpeed;
 
 var linkMovement = {
-    moveForward: false,
-    moveBackward: false,
-    moveLeft: false,
-    moveRight: false
-}
+    forward: false,
+    backward: false,
+    left: false,
+    right: false
+};
+
+var linkCollision = {
+    forward: false,
+    backward: false,
+    left: false,
+    right: false
+};
 
 var prevTime = performance.now();
 var linkVelocity = new THREE.Vector3();
@@ -665,7 +672,6 @@ function createMoon() {
     scene.add( light );
 }
 
-
 function createAmbientDaylight() {
     ambient = new THREE.AmbientLight(ambientDaylightColor, ambientDaylightIntensity);
     scene.add( ambient );
@@ -709,6 +715,104 @@ function buildTerrain() {
 // HANDLING FUNCTIONS
 // ============================================================================
 
+function handleLinkCollision(collidedObject) {
+    const link = models.link.root
+    const linkPosition = link.position;
+    const objPosition = collidedObject.position;
+
+    // Get displacement vector
+    var displacement = new THREE.Vector3();
+    displacement.copy(objPosition);
+    displacement.sub(linkPosition);
+    displacement.normalize();
+
+    // Account for link's rotation
+    const yAxis = new THREE.Vector3(0, 1, 0);
+    var linkRotation = link.rotation.y;
+    displacement.applyAxisAngle( yAxis, linkRotation );
+
+    if ( Math.abs(displacement.x) > Math.abs(displacement.z) ) {
+        // Left/Right collision
+        if ( displacement.x >= 0 ) {
+            // console.log("Link collision right!");
+            linkCollision.right = true;
+        } else {
+            // console.log("Link collision left!");
+            linkCollision.left = true;
+        }
+    } else {
+        // Forward/Backward collision
+        if ( displacement.z >= 0 ) {
+            // console.log("Link collision forward!");
+            linkCollision.forward = true;
+        } else {
+            // console.log("Link collision backward!");
+            linkCollision.backward = true;
+        }
+    }
+}
+
+function handleArrowCollision(collidedObject) {
+    if ( gameState.arrowFlying ) {
+        console.log("Target hit!");
+        stopArrowFlight();
+    }
+}
+
+function setCollider(object, collidableObjects, handleCollisionCallback) {
+
+    var objectBox = new THREE.Box3();
+    
+    var collidableObject;
+    var collidableBox = new THREE.Box3();
+
+    var collider = function() {
+        objectBox.setFromObject(object);
+        
+        for (var i = 0; i < collidableObjects.length; i++) {    
+            
+            collidableObject = collidableObjects[i];
+            collidableBox.setFromObject(collidableObject);
+            
+            if ( objectBox.intersectsBox(collidableBox) ) {
+                // a collision occurred... do something...
+                handleCollisionCallback(collidableObject);
+            }
+        }
+    }
+    
+    return collider;
+}
+
+function setLinkCollider() {
+    const link = models.link.root;
+    const target = models.target.root;
+
+    const collidableObjects = [target];
+
+    models.link.collider = setCollider(link, collidableObjects, handleLinkCollision);
+}
+
+function setArrowCollider() {
+    const arrow = models.arrow.root;
+    const target = models.target.root;
+
+    const collideableTarget = target.getObjectByName('TargetObject');
+
+    const collideableObjects = [target];
+
+    models.arrow.collider = setCollider(arrow, collideableObjects, handleArrowCollision);
+}
+
+function setColliders() {
+    setLinkCollider();
+    setArrowCollider();
+}
+
+function checkCollisions() {
+    models.link.collider();
+    models.arrow.collider();
+}
 
 function switchCamera() {
     
@@ -752,22 +856,22 @@ function setLinkMovementControls() {
 
             case 38: // up
             case 87: // w
-                linkMovement.moveForward = true;
+                linkMovement.forward = true;
                 break;
 
             case 37: // left
             case 65: // a
-                linkMovement.moveLeft = true;
+                linkMovement.left = true;
                 break;
 
             case 40: // down
             case 83: // s
-                linkMovement.moveBackward = true;
+                linkMovement.backward = true;
                 break;
 
             case 39: // right
             case 68: // d
-                linkMovement.moveRight = true;
+                linkMovement.right = true;
                 break;
 
             // case 32: // space
@@ -783,22 +887,22 @@ function setLinkMovementControls() {
 
             case 38: // up
             case 87: // w
-                linkMovement.moveForward = false;
+                linkMovement.forward = false;
                 break;
 
             case 37: // left
             case 65: // a
-                linkMovement.moveLeft = false;
+                linkMovement.left = false;
                 break;
 
             case 40: // down
             case 83: // s
-                linkMovement.moveBackward = false;
+                linkMovement.backward = false;
                 break;
 
             case 39: // right
             case 68: // d
-                linkMovement.moveRight = false;
+                linkMovement.right = false;
                 break;
 
         }
@@ -914,6 +1018,8 @@ function setControls() {
             setListeners(controls);
         }
     );
+
+    setColliders();
 
     gameState.controlsSet = true;
 }
@@ -1044,35 +1150,38 @@ function animateLinkMovement(time) {
     linkVelocity.z -= linkVelocity.z * floorFriction * dt;
 
     // Update velocity based on current direction
-    linkDirection.z = Number( linkMovement.moveBackward ) - Number( linkMovement.moveForward );
-    linkDirection.x = Number( linkMovement.moveLeft ) - Number( linkMovement.moveRight );
+    linkDirection.z = Number( linkMovement.backward ) - Number( linkMovement.forward );
+    linkDirection.x = Number( linkMovement.left ) - Number( linkMovement.right );
     linkDirection.normalize(); // this ensures consistent movements in all directions
 
-    if ( linkMovement.moveForward || linkMovement.moveBackward ) {
+    if ( linkMovement.forward && !linkCollision.forward ) {
         linkVelocity.z += linkDirection.z * linkMovementSpeed * dt;
     }
-    if ( linkMovement.moveLeft || linkMovement.moveRight ) {
+    if ( linkMovement.backward && !linkCollision.backward ) {
+        linkVelocity.z += linkDirection.z * linkMovementSpeed * dt;
+    }
+    if ( linkMovement.left && !linkCollision.left ) {
+        linkVelocity.x += linkDirection.x * linkMovementSpeed * dt;
+    }
+    if ( linkMovement.right && !linkCollision.right ) {
         linkVelocity.x += linkDirection.x * linkMovementSpeed * dt;
     }
 
     // Update position
     playerControls.moveRight( linkVelocity.x * dt );
     playerControls.moveForward( linkVelocity.z * dt );
-
-
-    // Start animation if movement
-    if ( (Math.abs(linkVelocity.z) >= movThreshold) || (Math.abs(linkVelocity.x) >= movThreshold) ) {
+    
+    if ( (Math.abs(linkVelocity.z) >= linkMovementThreshold) || (Math.abs(linkVelocity.x) >= linkMovementThreshold) ) {
+        // Start animation if movement
         startLinkWalkAnimation();
-    }
-
-    // Stop animation if no movement
-    if ( (Math.abs(linkVelocity.z) < movThreshold) && (Math.abs(linkVelocity.x) < movThreshold) ) {
+    } else {
+        // Stop animation if no movement
         stopLinkWalkAnimation();
         restoreLinkLowerLimbs();
     }
 
     // Update vertical position
-    playerControls.getObject().position.y += ( linkVelocity.y * dt ); // new behavior
+    playerControls.getObject().position.y += ( linkVelocity.y * dt ); 
 
     // Check vertical position (no infinite falling)
     if ( playerControls.getObject().position.y < 0 ) {
@@ -1083,6 +1192,11 @@ function animateLinkMovement(time) {
         linkVelocity.y -= g * linkMass * dt; 
     }
 
+    // Reset collisions
+    linkCollision.forward = false;
+    linkCollision.backward = false;
+    linkCollision.left = false;
+    linkCollision.right = false;
 }
 
 function startLinkWalkAnimation() {
@@ -1309,6 +1423,8 @@ function stopArrowFlight() {
 
 function render(time) {
     if ( !gameState.gamePaused ) {
+        checkCollisions();
+        
         TWEEN.update();
         animateLinkMovement(time);
 
