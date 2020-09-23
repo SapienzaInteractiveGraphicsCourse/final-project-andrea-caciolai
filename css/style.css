@@ -35,6 +35,14 @@ html, body {
     width: fit-content;
 }
 
+#scoreImg {
+    position: absolute;
+    top: 20px;
+    left: 80px;
+    height: 64px;
+    width: 128px;
+}
+
 #targetsDiv {
     position: relative;
 }
@@ -46,15 +54,15 @@ html, body {
 }
 
 .targetImg1 {
-    left: 80px;
+    left: 20px;
 }
 
 .targetImg2 {
-    left: 160px;
+    left: 100px;
 }
 
 .targetImg3 {
-    left: 240px;
+    left: 180px;
 }
 
 .midGameScreen {

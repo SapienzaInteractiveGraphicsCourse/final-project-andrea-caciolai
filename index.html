@@ -92,11 +92,20 @@
                         </div>
                     <div class="modal-body">
                         <p>
+                            <h4>Theme</h4>
                             Help Link master his archery skill, by hitting the target with an arrow three times. Remember, gravity counts!
                             <br/><br/>
+                            
+                            <h4>Controls</h4>
                             Move: WASD<br/>
                             Aim: MOUSE<br/>
-                            Switch camera (first person, third person): Q
+                            Switch camera: Q
+                            <br/><br/>
+                            
+                            <h4>Difficulty</h4>
+                            Easy: Target is still <br/>
+                            Medium: Target moves horizontally <br/>
+                            Hard: Target moves along a 8-shaped path.
                         </p>
                     </div>
                     <div class="modal-footer">
@@ -131,6 +140,7 @@
 
         <!-- HUD for hit/miss -->
         <div id="targetsDiv">
+            <img id="scoreImg" src="assets/images/score.png" hidden>
             <div id="targetsHitDiv">
                 <img id="hitImg1" class="targetImg targetImg1" src="assets/images/target-hit.png">
                 <img id="hitImg2" class="targetImg targetImg2" src="assets/images/target-hit.png">

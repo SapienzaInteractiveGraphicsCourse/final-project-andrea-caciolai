@@ -276,7 +276,7 @@ function initWebGL() {
     document.querySelector('#loadingScreen').hidden = true;
 }
 
-function initGUI() {
+function initLoadingScreen() {
     // Hide game menu
     document.querySelector( '#gameMenu' ).hidden = true;
 
@@ -312,6 +312,9 @@ function loadModels() {
     loadingManager.onLoad = function() {
         // console.log('Loading complete!');
         document.querySelector('#loadingScreen').classList.add( 'fade-out' );
+        
+        document.querySelector('#scoreImg').hidden = false;
+        
         gameState.modelsLoaded = true;
         main();
     };
@@ -1506,7 +1509,7 @@ export function main() {
     }
 
     if ( !gameState.guiInitialized ) {
-        initGUI();
+        initLoadingScreen();
         main();
     }
 
