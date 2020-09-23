@@ -1389,10 +1389,31 @@ function animateArrowFlight(time) {
     }
 }
 
+function buildNewArrow() {
+    const bow = models.bow;
+    const arrow = models.arrow;
+    
+    const arrowMesh = arrow.root.children[0].clone();
+
+    arrow.root = new THREE.Object3D();
+    arrow.root.name = "Arrow";
+    arrow.root.add(arrowMesh);
+
+    bow.root.add( arrow.root );
+    arrow.root.add( arrowCamera );
+    
+    arrow.root.scale.multiplyScalar(arrow.scale);
+    const rotation = UTILS.degToRad3(arrow.rotation);
+    arrow.root.rotation.set(...rotation);
+
+    // Reset collider
+    setArrowCollider();
+}
+
 function repositionArrow() {
     const arrow = models.arrow.root;
     var bow = models.bow.root;
-
+    
     bow.attach(arrow);
 
     arrow.position.x = 0.0;
@@ -1414,7 +1435,8 @@ function stopArrowFlight() {
     .onComplete(
         () => {
             currentCamera = cameras[currentCameraIdx];
-            repositionArrow();
+            // repositionArrow();
+            buildNewArrow();
             gameState.canShoot = true;
         })
     .start();
