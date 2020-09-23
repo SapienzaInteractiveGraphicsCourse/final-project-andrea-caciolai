@@ -101,7 +101,7 @@ models = {
         }
     },
     target:  { 
-        url: '../assets/models/target/target.gltf',
+        url: '../assets/models/new_target/new_target.gltf',
         position: [ 0, 0, 100 ],
         rotation: [ 0, 180, 0, ],
         scale: 10,
@@ -731,7 +731,9 @@ function handleLinkCollision(collidedObject) {
     var linkRotation = link.rotation.y;
     displacement.applyAxisAngle( yAxis, linkRotation );
 
-    if ( Math.abs(displacement.x) > Math.abs(displacement.z) ) {
+    const eps = 1e-3;
+
+    if ( Math.abs(displacement.x) > eps ) {
         // Left/Right collision
         if ( displacement.x >= 0 ) {
             // console.log("Link collision right!");
@@ -740,7 +742,8 @@ function handleLinkCollision(collidedObject) {
             // console.log("Link collision left!");
             linkCollision.left = true;
         }
-    } else {
+    }
+    if ( Math.abs(displacement.z) >= eps ) {
         // Forward/Backward collision
         if ( displacement.z >= 0 ) {
             // console.log("Link collision forward!");
@@ -797,9 +800,9 @@ function setArrowCollider() {
     const arrow = models.arrow.root;
     const target = models.target.root;
 
-    const collideableTarget = target.getObjectByName('TargetObject');
+    const collideableTarget = target.getObjectByName('Bullseye');
 
-    const collideableObjects = [target];
+    const collideableObjects = [collideableTarget];
 
     models.arrow.collider = setCollider(arrow, collideableObjects, handleArrowCollision);
 }
