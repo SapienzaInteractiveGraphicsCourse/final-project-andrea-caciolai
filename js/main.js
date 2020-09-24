@@ -137,6 +137,11 @@ const terrainWidth = 500;
 const terrainTextureRepeat = 32;
 const terrainTextureAnisotropy = 16;
 
+// Limit wall
+var wall;
+const zLimitWall = -20;
+const limitWallHeight = 50;
+
 // Light parameters
 
 // Directional light 
@@ -453,12 +458,33 @@ function initLinkJoints() {
     });
 }
 
+// function setLinkPosition() {
+//     const link = models.link;
+//     const increment = 10;
+
+//     switch (difficulty) {
+//         case "easy":
+//             break;
+//         case "medium":
+//             link.position[2] -= increment;
+//             break;
+//         case "hard":
+//             link.position[2] -= 2*increment;
+//             break;
+//         default:
+//             break;
+//     }
+
+//     link.root.position.set(...link.position);
+// }
+
 function buildLink() {
     const link = models.link;
     const clonedScene = SkeletonUtils.clone(link.gltf.scene);
     link.root = clonedScene.children[0];
     
     link.root.position.set(...link.position);
+    // setLinkPosition();
     link.root.scale.multiplyScalar(link.scale);
     const rotation = UTILS.degToRad3(link.rotation);
     link.root.rotation.set(...rotation);
@@ -548,6 +574,7 @@ function buildScene() {
     // createFog();
 
     buildTerrain();  
+    buildWall();
     buildModels();
 
     buildCameras();
@@ -563,7 +590,6 @@ function createFog() {
 // Cameras
 function buildFirstPersonCamera() {
     firstPersonCamera = new THREE.PerspectiveCamera(fov, aspect, near, far);    
-    // const bow = modelsMap.link.root.getObjectByName('Bow');
     const bow = models.bow.root;
 
     firstPersonCamera.position.set( ...firstPersonCameraPosition );
@@ -700,7 +726,13 @@ function createLights() {
     }
 }
 
-// Ground
+// Walls and ground
+function buildWall() {
+    const planeNormal = new THREE.Vector3(0, 0, 1);
+    wall = new THREE.Plane(planeNormal, zLimitWall);
+    scene.add( wall );
+}
+
 function buildTerrain() {
     var terrainTexture = textureLoader.load( '../assets/textures/grass_texture.png' );
     terrainTexture.wrapS = terrainTexture.wrapT = THREE.RepeatWrapping;
@@ -775,8 +807,8 @@ function pauseGame() {
 }
 
 // Collisions
-function handleLinkCollision(collidedObject) {
-    const link = models.link.root
+function handleLinkCollisionObject(collidedObject) {
+    const link = models.link.root;
     const linkPosition = link.position;
     const objPosition = collidedObject.position;
 
@@ -791,9 +823,9 @@ function handleLinkCollision(collidedObject) {
     var linkRotation = link.rotation.y;
     displacement.applyAxisAngle( yAxis, linkRotation );
 
-    const eps = 1e-3;
+    const eps = 1e-6;
 
-    if ( Math.abs(displacement.x) > eps ) {
+    if ( Math.abs(displacement.x) >= eps ) {
         // Left/Right collision
         if ( displacement.x >= 0 ) {
             linkCollision.right = true;
@@ -808,6 +840,34 @@ function handleLinkCollision(collidedObject) {
         } else {
             linkCollision.backward = true;
         }
+    }
+}
+
+function handleLinkCollisionPlane(collidedPlane) {
+    const link = models.link.root;
+    
+    var linkAngle = link.rotation.y;
+    console.log(linkAngle);
+    console.log(linkDirection);
+
+    if ( linkDirection.z <= 0 ) {
+        linkCollision.forward = true;
+    } else {
+        linkCollision.backward = true;
+    }
+
+    if ( linkAngle >= 0 ) {
+        linkCollision.right = true;
+    } else {
+        linkCollision.left = true;
+    }
+}
+
+function handleLinkCollision(collidedObject) {
+    if ( collidedObject.type === "Object3D" ) {
+        handleLinkCollisionObject(collidedObject);
+    } else {
+        handleLinkCollisionPlane(collidedObject);
     }
 }
 
@@ -836,7 +896,7 @@ function registerArrowMiss() {
     document.querySelector("#"+imgName).style.visibility = "visible";
 }
 
-function setCollider(object, collidableObjects, handleCollisionCallback) {
+function buildObjectsCollider(object, collidableObjects, handleCollisionCallback) {
 
     var objectBox = new THREE.Box3();
     
@@ -861,16 +921,42 @@ function setCollider(object, collidableObjects, handleCollisionCallback) {
     return collider;
 }
 
-function setLinkCollider() {
+function buildPlaneColliders(object, collideablePlanes, handleCollisionCallback) {
+    var objectBox = new THREE.Box3();
+    
+    var collidablePlane;
+
+    var collider = function() {
+        objectBox.setFromObject(object);
+        
+        for (var i = 0; i < collideablePlanes.length; i++) {    
+            
+            collidablePlane = collideablePlanes[i];
+            
+            if ( objectBox.intersectsPlane(collidablePlane) ) {
+                // a collision occurred... do something...
+                handleCollisionCallback(collidablePlane);
+            }
+        }
+    }
+    
+    return collider;
+}
+
+function setLinkColliders() {
     const link = models.link.root;
     const target = models.target.root;
 
     const collidableObjects = [target];
 
-    models.link.collider = setCollider(link, collidableObjects, handleLinkCollision);
+    models.link.colliders = [];
+    models.link.colliders.push(buildObjectsCollider(link, collidableObjects, handleLinkCollision));
+
+    const collidablePlanes = [wall];
+    models.link.colliders.push(buildPlaneColliders(link, collidablePlanes, handleLinkCollision));
 }
 
-function setArrowCollider() {
+function setArrowColliders() {
     const arrow = models.arrow.root;
     const target = models.target.root;
 
@@ -878,17 +964,22 @@ function setArrowCollider() {
 
     const collideableObjects = [collideableTarget];
 
-    models.arrow.collider = setCollider(arrow, collideableObjects, handleArrowCollision);
+    models.arrow.colliders = [];
+    models.arrow.colliders.push(buildObjectsCollider(arrow, collideableObjects, handleArrowCollision));
 }
 
 function setColliders() {
-    setLinkCollider();
-    setArrowCollider();
+    setLinkColliders();
+    setArrowColliders();
 }
 
 function checkCollisions() {
-    models.link.collider();
-    models.arrow.collider();
+    models.link.colliders.forEach((collider) => {
+        collider();
+    });
+    models.arrow.colliders.forEach((collider) => {
+        collider();
+    });
 }
 
 // Controls
@@ -1486,7 +1577,7 @@ function buildNewArrow() {
     arrow.root.rotation.set(...rotation);
 
     // Reset collider
-    setArrowCollider();
+    setArrowColliders();
 }
 
 function stopArrowFlight() {
