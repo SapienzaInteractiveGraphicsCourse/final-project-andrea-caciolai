@@ -137,10 +137,11 @@ const terrainWidth = 500;
 const terrainTextureRepeat = 32;
 const terrainTextureAnisotropy = 16;
 
-// Limit wall
-var wall;
-const zLimitWall = -20;
-const limitWallHeight = 50;
+// Map limits
+const mapLimitForward = 10.0;
+const mapLimitBackward = -terrainWidth/4;
+const mapLimitLeft = -terrainWidth/4;
+const mapLimitRight = terrainWidth/4;
 
 // Light parameters
 
@@ -458,26 +459,6 @@ function initLinkJoints() {
     });
 }
 
-// function setLinkPosition() {
-//     const link = models.link;
-//     const increment = 10;
-
-//     switch (difficulty) {
-//         case "easy":
-//             break;
-//         case "medium":
-//             link.position[2] -= increment;
-//             break;
-//         case "hard":
-//             link.position[2] -= 2*increment;
-//             break;
-//         default:
-//             break;
-//     }
-
-//     link.root.position.set(...link.position);
-// }
-
 function buildLink() {
     const link = models.link;
     const clonedScene = SkeletonUtils.clone(link.gltf.scene);
@@ -574,7 +555,6 @@ function buildScene() {
     // createFog();
 
     buildTerrain();  
-    buildWall();
     buildModels();
 
     buildCameras();
@@ -726,13 +706,6 @@ function createLights() {
     }
 }
 
-// Walls and ground
-function buildWall() {
-    const planeNormal = new THREE.Vector3(0, 0, 1);
-    wall = new THREE.Plane(planeNormal, zLimitWall);
-    scene.add( wall );
-}
-
 function buildTerrain() {
     var terrainTexture = textureLoader.load( '../assets/textures/grass_texture.png' );
     terrainTexture.wrapS = terrainTexture.wrapT = THREE.RepeatWrapping;
@@ -843,31 +816,11 @@ function handleLinkCollisionObject(collidedObject) {
     }
 }
 
-function handleLinkCollisionPlane(collidedPlane) {
-    const link = models.link.root;
-    
-    var linkAngle = link.rotation.y;
-    console.log(linkAngle);
-    console.log(linkDirection);
-
-    if ( linkDirection.z <= 0 ) {
-        linkCollision.forward = true;
-    } else {
-        linkCollision.backward = true;
-    }
-
-    if ( linkAngle >= 0 ) {
-        linkCollision.right = true;
-    } else {
-        linkCollision.left = true;
-    }
-}
-
 function handleLinkCollision(collidedObject) {
     if ( collidedObject.type === "Object3D" ) {
         handleLinkCollisionObject(collidedObject);
     } else {
-        handleLinkCollisionPlane(collidedObject);
+        console.log("ERROR!");
     }
 }
 
@@ -921,28 +874,6 @@ function buildObjectsCollider(object, collidableObjects, handleCollisionCallback
     return collider;
 }
 
-function buildPlaneColliders(object, collideablePlanes, handleCollisionCallback) {
-    var objectBox = new THREE.Box3();
-    
-    var collidablePlane;
-
-    var collider = function() {
-        objectBox.setFromObject(object);
-        
-        for (var i = 0; i < collideablePlanes.length; i++) {    
-            
-            collidablePlane = collideablePlanes[i];
-            
-            if ( objectBox.intersectsPlane(collidablePlane) ) {
-                // a collision occurred... do something...
-                handleCollisionCallback(collidablePlane);
-            }
-        }
-    }
-    
-    return collider;
-}
-
 function setLinkColliders() {
     const link = models.link.root;
     const target = models.target.root;
@@ -952,8 +883,6 @@ function setLinkColliders() {
     models.link.colliders = [];
     models.link.colliders.push(buildObjectsCollider(link, collidableObjects, handleLinkCollision));
 
-    const collidablePlanes = [wall];
-    models.link.colliders.push(buildPlaneColliders(link, collidablePlanes, handleLinkCollision));
 }
 
 function setArrowColliders() {
@@ -1256,6 +1185,7 @@ function animateLinkMovement(time) {
     linkDirection.x = Number( linkMovement.left ) - Number( linkMovement.right );
     linkDirection.normalize(); // this ensures consistent movements in all directions
 
+    // Update velocity (with collision check)
     if ( linkMovement.forward && !linkCollision.forward ) {
         linkVelocity.z += linkDirection.z * linkMovementSpeed * dt;
     }
@@ -1269,10 +1199,28 @@ function animateLinkMovement(time) {
         linkVelocity.x += linkDirection.x * linkMovementSpeed * dt;
     }
 
-    // Update position
+    // Update position with velocity
     playerControls.moveRight( linkVelocity.x * dt );
     playerControls.moveForward( linkVelocity.z * dt );
     
+    // Check map boundaries
+    if (models.link.root.position.z >= mapLimitForward) {
+        models.link.root.position.z = mapLimitForward;
+        linkVelocity.z = 0.0;
+    } 
+    if (models.link.root.position.z <= mapLimitBackward) {
+        models.link.root.position.z = mapLimitBackward;
+        linkVelocity.z = 0.0;
+    }
+    if (models.link.root.position.x <= mapLimitLeft) {
+        models.link.root.position.x = mapLimitLeft;
+        linkVelocity.x = 0.0;
+    } 
+    if (models.link.root.position.x >= mapLimitRight) {
+        models.link.root.position.x = mapLimitRight;
+        linkVelocity.x = 0.0;
+    }
+
     if ( (Math.abs(linkVelocity.z) >= linkMovementThreshold) || (Math.abs(linkVelocity.x) >= linkMovementThreshold) ) {
         // Start animation if movement
         startLinkWalkAnimation();
