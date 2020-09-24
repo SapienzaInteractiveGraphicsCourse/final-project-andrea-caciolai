@@ -76,3 +76,10 @@ export function removeFromArray(array, obj) {
     var filtered = array.filter(function(el) { return el !== obj; }); 
     return filtered;
 }
+
+export function vector3Norm(vec) {
+    var x, y, z;
+    x = vec.x; y = vec.y; z = vec.z;
+
+    return Math.sqrt(x*x + y*y + z*z);
+}

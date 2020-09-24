@@ -1532,19 +1532,16 @@ function startTargetMediumAnimation() {
     const targetTime = 5 * 1000;
     const target = models.target.root;
 
-    var targetPosition = {x: target.position.x};
-
-    var targetTween1 = new TWEEN.Tween(models.target.root.position)
+    var targetTween1 = new TWEEN.Tween(target.position)
     .to({x: -1.0*xLimit}, 0.5 * targetTime);
 
-    var targetTween2 = new TWEEN.Tween(models.target.root.position)
+    var targetTween2 = new TWEEN.Tween(target.position)
     .to({x: 1.0*xLimit}, targetTime);
     
-    var targetTween3 = new TWEEN.Tween(models.target.root.position)
+    var targetTween3 = new TWEEN.Tween(target.position)
     .to({x: 0.0}, 0.5 * targetTime);
 
     // Chaining (infinite loop)
-
     targetTween1.chain(targetTween2);
     targetTween2.chain(targetTween3);
     targetTween3.chain(targetTween1);
@@ -1557,11 +1554,70 @@ function startTargetMediumAnimation() {
     targetTween1.start();
 }
 
-function startTargetHardAnimation() {}
+function startTargetHardAnimation() {
+    const xLimit = 0.25 * terrainWidth;
+    const zLimit = xLimit;
+    
+    const targetTime = 5 * 1000;
+    const target = models.target.root;
+    
+    // Setting waypoints
+    const initX = target.position.x;
+    const initZ = target.position.z;
 
-function stopTargetAnimation() {
-    UTILS.stopTweens(targetMovementTweens);
+    // Right circle
+    const A = {x: initX, z: initZ};
+    const B = {x: initX + 0.5*xLimit, z: initZ - 0.5*zLimit};
+    const C = {x: initX + xLimit, z: initZ};
+    const D = {x: initX + 0.5*xLimit, z: initZ + 0.5*zLimit};
+
+    // Left circle
+    const E = {x: initX - 0.5*xLimit, z: initZ - 0.5*zLimit};
+    const F = {x: initX - xLimit, z: initZ};
+    const G = {x: initX - 0.5*xLimit, z: initZ + 0.5*zLimit};
+
+    // Setting tweens
+    var targetTweenAB = new TWEEN.Tween(target.position)
+    .to(B, 0.25 * targetTime);
+    var targetTweenBC = new TWEEN.Tween(target.position)
+    .to(C, 0.25 * targetTime);
+    var targetTweenCD = new TWEEN.Tween(target.position)
+    .to(D, 0.25 * targetTime);
+    var targetTweenDA = new TWEEN.Tween(target.position)
+    .to(A, 0.25 * targetTime);
+
+    var targetTweenAE = new TWEEN.Tween(target.position)
+    .to(E, 0.25 * targetTime);
+    var targetTweenEF = new TWEEN.Tween(target.position)
+    .to(F, 0.25 * targetTime);
+    var targetTweenFG = new TWEEN.Tween(target.position)
+    .to(G, 0.25 * targetTime);
+    var targetTweenGA = new TWEEN.Tween(target.position)
+    .to(A, 0.25 * targetTime);
+    
+    // Chaining (infinite loop)
+    targetTweenAB.chain(targetTweenBC);
+    targetTweenBC.chain(targetTweenCD);
+    targetTweenCD.chain(targetTweenDA);
+    targetTweenDA.chain(targetTweenAE);
+    targetTweenAE.chain(targetTweenEF);
+    targetTweenEF.chain(targetTweenFG);
+    targetTweenFG.chain(targetTweenGA);
+    targetTweenGA.chain(targetTweenAB);
+
+    // Start
+    targetMovementTweens.push(targetTweenAB);
+    targetMovementTweens.push(targetTweenBC);
+    targetMovementTweens.push(targetTweenCD);
+    targetMovementTweens.push(targetTweenDA);
+    targetMovementTweens.push(targetTweenAE);
+    targetMovementTweens.push(targetTweenEF);
+    targetMovementTweens.push(targetTweenFG);
+    targetMovementTweens.push(targetTweenGA);
+
+    targetTweenAB.start();
 }
+
 
 // ============================================================================
 // RENDERING FUNCTIONS
