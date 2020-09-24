@@ -52,6 +52,68 @@ var arrowCamera;
 
 var cameras;
 
+// Camera parameters
+const fov = 45;
+const aspect = window.innerWidth / window.innerHeight; 
+const near = 0.1;
+const far = 100000;
+
+const firstPersonCameraPosition = [ 2.0, 3.0, -12.0 ];
+const firstPersonCameraTarget = [ 2.0, 3.0, 1.0 ];
+
+const fogNear = 50;
+const fogFar = 1000;
+const daylightBackgroundColor = 0xcce0ff;
+const nightBackgroundColor = 0x070B34;
+
+// Terrain parameters
+const terrainWidth = 500;
+const terrainTextureRepeat = 32;
+const terrainTextureAnisotropy = 16;
+
+// Map limits
+const mapLimitForward = 10.0;
+const mapLimitBackward = -terrainWidth/2 + 20.0;
+const mapLimitLeft = -terrainWidth/2 + 20.0;
+const mapLimitRight = terrainWidth/2 - 20.0;
+
+// Light parameters
+
+// Directional light 
+const lightDistance = 200;
+const lightTarget = [ 0, 0, 0 ];
+const sunlightColor = 0xfffeae;
+const sunlightIntensity = 10.0;
+
+const lightShadowMapWidth = 2048; 
+const lightShadowMapHeight = 2048;
+
+const lightShadowCameraWidth = terrainWidth / 2;
+const lightShadowCameraHeight = terrainWidth / 2;
+const lightShadowCameraDepth = 1024;
+
+// Sun
+const sunRadius = 20;
+const sunWidthSegments = 12;
+const sunHeightSegments = 12;
+
+const sunPosition = [ 1, 0.5, -2 ];
+const sunColor = 0xfffeae;
+
+// Moon
+const moonPosition = [ 1, 0.2, 2 ];
+const moonColor = 0xe5e5e5;
+const moonlightColor = 0xe5e5e5;
+const moonlightIntensity = 2.0;
+
+// Ambient light
+const ambientDaylightColor = 0xFFFFFF;
+const ambientDaylightIntensity = 1;
+const ambientNightIntensity = 2;
+const ambientNightColor = 0x2B2F77;
+
+
+
 // Model variables
 var models;
 var loadModelsList;
@@ -113,70 +175,16 @@ models = {
         rotation: [0, 0, 0],
         scale: 22,
         buildCallback: buildArrow,
+    },
+    tree: {
+        url: '../assets/models/new_tree/new_tree.gltf',
+        rotation: [0, 0, 0],
+        scale: 3,
+        buildCallback: buildTrees,
     }
 };
 
-loadModelsList = [models.link, models.target, models.arrow];
-
-// Camera parameters
-const fov = 45;
-const aspect = window.innerWidth / window.innerHeight; 
-const near = 0.1;
-const far = 100000;
-
-const firstPersonCameraPosition = [ 2.0, 3.0, -12.0 ];
-const firstPersonCameraTarget = [ 2.0, 3.0, 1.0 ];
-
-const fogNear = 50;
-const fogFar = 1000;
-const daylightBackgroundColor = 0xcce0ff;
-const nightBackgroundColor = 0x070B34;
-
-// Terrain parameters
-const terrainWidth = 500;
-const terrainTextureRepeat = 32;
-const terrainTextureAnisotropy = 16;
-
-// Map limits
-const mapLimitForward = 10.0;
-const mapLimitBackward = -terrainWidth/4;
-const mapLimitLeft = -terrainWidth/4;
-const mapLimitRight = terrainWidth/4;
-
-// Light parameters
-
-// Directional light 
-const lightDistance = 200;
-const lightTarget = [ 0, 0, 0 ];
-const sunlightColor = 0xfffeae;
-const sunlightIntensity = 10.0;
-
-const lightShadowMapWidth = 2048; 
-const lightShadowMapHeight = 2048;
-
-const lightShadowCameraWidth = terrainWidth / 2;
-const lightShadowCameraHeight = terrainWidth / 2;
-const lightShadowCameraDepth = 1024;
-
-// Sun
-const sunRadius = 20;
-const sunWidthSegments = 12;
-const sunHeightSegments = 12;
-
-const sunPosition = [ 1, 0.5, -2 ];
-const sunColor = 0xfffeae;
-
-// Moon
-const moonPosition = [ 1, 0.2, 2 ];
-const moonColor = 0xe5e5e5;
-const moonlightColor = 0xe5e5e5;
-const moonlightIntensity = 2.0;
-
-// Ambient light
-const ambientDaylightColor = 0xFFFFFF;
-const ambientDaylightIntensity = 1;
-const ambientNightIntensity = 2;
-const ambientNightColor = 0x2B2F77;
+loadModelsList = [models.link, models.target, models.arrow, models.tree];
 
 // Link movement variables and params
 var linkRestJoints = {
@@ -536,6 +544,55 @@ function buildArrow() {
     console.log(UTILS.dumpObject(arrow.root));
 }
 
+function buildTree(idx, position, rotation) {
+    var tree = new THREE.Object3D();
+    tree.name = "Tree" + idx;
+    tree.add(models.tree.gltf.scene.children[0].clone());
+
+    tree.position.set(...position);
+    tree.scale.multiplyScalar(models.tree.scale);
+    tree.rotation.set(...rotation);
+
+    scene.add( tree );
+    console.log(UTILS.dumpObject(tree));
+}
+
+function buildTrees() {
+
+    const numTrees = 5;
+    const treeWidth = 0;
+    const offset = (terrainWidth - 2*treeWidth) / numTrees;
+    
+    var position = [terrainWidth/2 - treeWidth, 0, terrainWidth/2 - treeWidth];
+    var rotation = [0, 0, 0];
+
+    // Trees on the front
+    for (var i = 0; i < numTrees; i++) {
+        buildTree(i, position, rotation);
+        position[0] -= offset;
+    }
+    rotation[1] -= 0.5 * Math.PI;
+
+    // Trees on the right
+    for (var i = numTrees; i < 2*numTrees; i++) {
+        buildTree(i, position, rotation);
+        position[2] -= offset;
+    }
+    rotation[1] -= 0.5 * Math.PI;
+
+    // Trees on the back
+    for (var i = 2*numTrees; i < 3*numTrees; i++) {
+        buildTree(i, position, rotation);
+        position[0] += offset;
+    }
+    rotation[1] -= 0.5 * Math.PI;
+
+    // Trees on the left
+    for (var i = 3*numTrees; i < 4*numTrees; i++) {
+        buildTree(i, position, rotation);
+        position[2] += offset;
+    }
+}
 
 // ============================================================================
 // SCENE BUILDING FUNCTIONS
