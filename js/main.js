@@ -260,10 +260,8 @@ const arrowForce = 20.0;
 const arrowMass = 1.0; 
 const maxCharge = 2.0;
 
+var arrowsLeft = 3;
 var arrowHits = 0;
-var arrowShots = 0;
-
-const maxShots = 3;
 
 // Target movement
 var targetMovementTweens = [];
@@ -300,8 +298,8 @@ function initLoadingScreen() {
     // Show loading screen
     document.querySelector( '#loadingScreen' ).hidden = false;
 
-    // Hide pauseScreen
-    document.querySelector( '#gameMenu' ).hidden = true;
+    // Hide pause screen
+    document.querySelector( '#pauseScreen' ).hidden = true;
 
 
     // Hide crosshair
@@ -327,7 +325,7 @@ function loadModels() {
         // console.log('Loading complete!');
         document.querySelector('#loadingScreen').classList.add( 'fade-out' );
         
-        document.querySelector('#scoreImg').hidden = false;
+        document.querySelector('#arrowsDiv').hidden = false;
 
         gameState.modelsLoaded = true;
         main();
@@ -554,7 +552,6 @@ function buildTree(idx, position, rotation) {
     tree.rotation.set(...rotation);
 
     scene.add( tree );
-    console.log(UTILS.dumpObject(tree));
 }
 
 function buildTrees() {
@@ -763,6 +760,17 @@ function createLights() {
     }
 }
 
+function randomHeightTerrain(terrainGeometry) {
+    var vertices = terrainGeometry.attributes.position.array;
+    var noise;
+    const scale = 2;
+
+    for (var i = 0; i < vertices.length; i++) {
+        noise = Math.random();
+        vertices[i] += scale*noise;
+    }
+}
+
 function buildTerrain() {
     var terrainTexture = textureLoader.load( '../assets/textures/grass_texture.png' );
     terrainTexture.wrapS = terrainTexture.wrapT = THREE.RepeatWrapping;
@@ -774,7 +782,12 @@ function buildTerrain() {
 
     var terrainMaterial = new THREE.MeshLambertMaterial( { map: terrainTexture } );
 
-    var terrain = new THREE.Mesh( new THREE.PlaneBufferGeometry( terrainWidth, terrainWidth ), terrainMaterial );
+    var terrainGeometry = new THREE.PlaneBufferGeometry( terrainWidth, terrainWidth, terrainTextureRepeat, terrainTextureRepeat );
+
+    // randomHeightTerrain(terrainGeometry);
+
+    var terrain = new THREE.Mesh(terrainGeometry, terrainMaterial );
+
     terrain.position.y = 0;
     terrain.rotation.x = - Math.PI / 2;
     terrain.receiveShadow = true;
@@ -787,7 +800,7 @@ function buildTerrain() {
 
 // Game state handling
 function checkGameOver() {
-    if ( arrowShots >= maxShots ) {
+    if ( arrowsLeft <= 0 ) {
         console.log("GAME OVER!");
         gameOver();
     }
@@ -808,8 +821,9 @@ function gameOver() {
 
     // Show game over screen
     var gameOverDiv = document.querySelector("#gameOverDiv");
-    gameOverDiv.innerHTML += "You hit the target " + arrowHits + "/" + arrowShots + " times.<br/><br/>Reload the page to play again!"  
+    gameOverDiv.innerHTML += "You hit the target " + arrowHits + " times!<br/><br/>Reload the page to play again!"  
 
+    document.querySelector("#arrowsDiv").hidden = true;
     document.querySelector("#gameOverScreen").hidden = false;
 }
 
@@ -893,17 +907,14 @@ function handleArrowCollision(collidedObject) {
 
 function registerArrowHit() {
     arrowHits += 1;
-    arrowShots += 1;
-
-    var imgName = "hitImg" + arrowShots;
-    document.querySelector("#"+imgName).style.visibility = "visible";
 }
 
 function registerArrowMiss() {
-    arrowShots += 1;
 
-    var imgName = "missImg" + arrowShots;
-    document.querySelector("#"+imgName).style.visibility = "visible";
+    var imgName = "arrowImg" + arrowsLeft;
+    document.querySelector("#"+imgName).style.visibility = "hidden";
+    
+    arrowsLeft -= 1;
 }
 
 function buildObjectsCollider(object, collidableObjects, handleCollisionCallback) {

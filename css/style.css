@@ -35,7 +35,40 @@ html, body {
     width: fit-content;
 }
 
-#scoreImg {
+#arrowsDiv {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    width: fit-content;
+    height: fit-content;
+    pointer-events: none;
+    background: #9de288;
+    opacity: 0.90;
+}
+
+#arrowLeftImg {
+    position: relative;
+    height: 64px;
+}
+
+.arrowImg {
+    position: relative;
+    width: 50px;
+}
+
+/* .arrowImg1 {
+    left: 0px;
+}
+
+.arrowImg2 {
+    left: 50px;
+}
+
+.arrowImg3 {
+    left: 100px;
+} */
+
+/* #scoreImg {
     position: absolute;
     top: 20px;
     left: 80px;
@@ -63,7 +96,7 @@ html, body {
 
 .targetImg3 {
     left: 180px;
-}
+} */
 
 .midGameScreen {
     position: absolute;

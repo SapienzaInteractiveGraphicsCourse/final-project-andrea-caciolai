@@ -93,7 +93,14 @@
                     <div class="modal-body">
                         <p>
                             <h4>Theme</h4>
-                            Help Link master his archery skill, by hitting the target with an arrow three times. Remember, gravity counts!
+                            Help Link master his archery skill.
+                            
+                            His arrows are magical, so each time he hits the target, a new arrow respawns in his quiver. 
+                            However, each time he misses the target, the arrow does not respawn, so you have at most three chances to miss, after which it is game over!
+                            
+                            You cannot go too close to the target, so position yourself in a good spot, aim, and shoot. 
+                            
+                            Remember, gravity matters!
                             <br/><br/>
                             
                             <h4>Controls</h4>
@@ -138,21 +145,26 @@
             </div>
         </div>
 
-        <!-- HUD for hit/miss -->
-        <div id="targetsDiv">
-            <img id="scoreImg" src="assets/images/score.png" hidden>
-            <div id="targetsHitDiv">
-                <img id="hitImg1" class="targetImg targetImg1" src="assets/images/target-hit.png">
-                <img id="hitImg2" class="targetImg targetImg2" src="assets/images/target-hit.png">
-                <img id="hitImg3" class="targetImg targetImg3" src="assets/images/target-hit.png">
+        <!-- HUD for arrows -->
+        <div id="arrowsDiv" class="container" hidden>
+            <div class="row">
+                <div class="col">
+                    <img id="arrowLeftImg" src="assets/images/arrows-left-text.png">
+                </div>
             </div>
-            <div id="targetsMissDiv">
-                <img id="missImg1" class="targetImg targetImg1" src="assets/images/target-miss.png">
-                <img id="missImg2" class="targetImg targetImg2" src="assets/images/target-miss.png">
-                <img id="missImg3" class="targetImg targetImg3" src="assets/images/target-miss.png">
+            <div class="row">
+                <div class="col">
+                    <img id="arrowImg1" class="arrowImg arrowImg1" src="assets/images/arrow-pixel.png">
+                </div>
+                <div class="col">
+                    <img id="arrowImg2" class="arrowImg arrowImg2" src="assets/images/arrow-pixel.png">
+                </div>
+                <div class="col">
+                    <img id="arrowImg3" class="arrowImg arrowImg3" src="assets/images/arrow-pixel.png">
+                </div>
             </div>
         </div>
-
+        
         <!-- Simple starter script -->
         <script type="module">
             import {main} from "./js/main.js";
