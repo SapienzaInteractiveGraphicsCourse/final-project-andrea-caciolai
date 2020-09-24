@@ -32,7 +32,7 @@ export function vec3ToArr(vec) {
     return [vec.x, vec.y, vec.z];
 }
 
-export function ArrToVec3(arr) {
+export function arrToVec3(arr) {
     return new THREE.Vector3(arr[0], arr[1], arr[2]);
 }
 

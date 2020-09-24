@@ -1,8 +1,8 @@
 import * as THREE from '../lib/three.js/build/three.module.js'
 import {GLTFLoader} from '../lib/three.js/examples/jsm/loaders/GLTFLoader.js'
 import { OrbitControls } from '../lib/three.js/examples/jsm/controls/OrbitControls.js';
-// import { PointerLockControls } from '../lib/three.js/examples/jsm/controls/PointerLockControls.js';
-import { MovementPointerLockControls, AimPointerLockControls, HeadPointerLockControls } from './controls.js';
+
+import { MovementPointerLockControls, CameraOrbitControls, CameraPointerLockControls, AimPointerLockControls, HeadPointerLockControls } from './controls.js';
 import TWEEN from '../lib/tween.js/dist/tween.esm.js'
 
 import {SceneUtils} from '../lib/three.js/examples/jsm/utils/SceneUtils.js'
@@ -26,17 +26,14 @@ var gameState = {
     sceneBuilt: false,
     controlsSet: false,
     canShoot: false,
-    shooting: false,
-    shootInitTime: null,
-    shootFinalTime: null,
+    nocking: false,
+    nockingInitTime: null,
+    nockingFinalTime: null,
     arrowFlying: false,
 };
 
 var difficulty;
 var daylight;
-
-var playerControls;
-var gameControls = [];
 
 // Objects variables
 var scene;
@@ -48,6 +45,7 @@ var currentCameraIdx = 0;
 
 var firstPersonCamera;
 var thirdPersonCamera;
+var thirdPersonCameraPivot;
 var arrowCamera;
 
 var cameras;
@@ -57,9 +55,6 @@ const fov = 45;
 const aspect = window.innerWidth / window.innerHeight; 
 const near = 0.1;
 const far = 100000;
-
-const firstPersonCameraPosition = [ 2.0, 3.0, -12.0 ];
-const firstPersonCameraTarget = [ 2.0, 3.0, 1.0 ];
 
 const fogNear = 50;
 const fogFar = 1000;
@@ -111,8 +106,6 @@ const ambientDaylightColor = 0xFFFFFF;
 const ambientDaylightIntensity = 1;
 const ambientNightIntensity = 2;
 const ambientNightColor = 0x2B2F77;
-
-
 
 // Model variables
 var models;
@@ -265,6 +258,17 @@ var arrowHits = 0;
 
 // Target movement
 var targetMovementTweens = [];
+
+// Controls variables
+
+var linkMovementControls;
+var linkThirdCameraControls;
+var linkFirstCameraControls;
+
+var aimControlsArmL;
+var aimControlsArmR;
+var aimControlsHead;
+var gameControls = [];
 
 // ============================================================================
 // INITIALIZATION FUNCTIONS
@@ -625,6 +629,9 @@ function createFog() {
 function buildFirstPersonCamera() {
     firstPersonCamera = new THREE.PerspectiveCamera(fov, aspect, near, far);    
     const bow = models.bow.root;
+    
+    const firstPersonCameraPosition = [ 2.0, 3.0, -12.0 ];
+    const firstPersonCameraTarget = [ 2.0, 3.0, 1.0 ];
 
     firstPersonCamera.position.set( ...firstPersonCameraPosition );
     firstPersonCamera.lookAt( ...firstPersonCameraTarget );
@@ -635,15 +642,20 @@ function buildFirstPersonCamera() {
 function buildThirdPersonCamera() {
     const link = models.link.root;
 
-    const thirdPersonCameraPosition = [ link.position.x, link.position.y + 3, link.position.z - 5 ];
+    const thirdPersonCameraPosition = [ 0, 3, - 5 ];
     const thirdPersonCameraTarget = [ link.position.x, link.position.y + 2 , link.position.z ];
 
     thirdPersonCamera = new THREE.PerspectiveCamera(fov, aspect, near, far);    
 
+    thirdPersonCameraPivot = new THREE.Object3D();
+    thirdPersonCameraPivot.position.set( ...thirdPersonCameraTarget );
+    
+    // link.add( thirdPersonCamera );
+    link.add(thirdPersonCameraPivot);
+    thirdPersonCameraPivot.add(thirdPersonCamera);
+    
     thirdPersonCamera.position.set( ...thirdPersonCameraPosition );
     thirdPersonCamera.lookAt( ...thirdPersonCameraTarget );
-    
-    link.add( thirdPersonCamera );
 }
 
 function buildArrowCamera() {
@@ -668,7 +680,11 @@ function buildCameras() {
     buildThirdPersonCamera();
     buildArrowCamera();
 
-    cameras = [thirdPersonCamera, firstPersonCamera];
+    cameras = {
+        third: thirdPersonCamera, 
+        first: firstPersonCamera,
+        arrow: arrowCamera
+    };
 }
 
 // Lights
@@ -980,42 +996,75 @@ function checkCollisions() {
 }
 
 // Controls
-function switchCamera() {
-    
+function setFirstPersonCamera() {
     if (gameState.gamePaused) return;
     if (gameState.arrowFlying) return;
-
-    currentCameraIdx = (currentCameraIdx + 1) % cameras.length;
-    currentCamera = cameras[currentCameraIdx];
-
-    if ( currentCamera === firstPersonCamera ) {
-        document.querySelector( '#crosshair' ).hidden = false;
-    } else {
-        document.querySelector( '#crosshair' ).hidden = true;
-    }
+    
+    currentCamera = cameras.first;
+    linkThirdCameraControls.enabled = false;
+    linkFirstCameraControls.enabled = true;
+    document.querySelector( '#crosshair' ).hidden = false;
 }
 
-function setCameraControls() {
-    var onKeyDown = function( event ) {
-
-        switch (  event.keyCode ) {
-            case 81: // q
-                switchCamera();
-                break;
-        }
-    }
+function setThirdPersonCamera() {
+    if (gameState.gamePaused) return;
+    if (gameState.arrowFlying) return;
     
-    document.addEventListener( 'keydown', onKeyDown, false );
-    gameControls.push(playerControls);
+    currentCamera = cameras.third;
+    linkFirstCameraControls.enabled = false;
+    linkThirdCameraControls.enabled = true;
+    document.querySelector( '#crosshair' ).hidden = true;
+}
+
+function setCameraSwitchControls() {
+    var onMouseClick = function (event) {
+        if (gameState.gamePaused) return;
+        if (gameState.gameOver) return;
+
+        if (event.button === 2) {
+            // Right mouse clicked
+            enableAimControls();
+            setFirstPersonCamera();
+        }
+    };
+
+    var onMouseRelease = function (event) {
+        if (gameState.gamePaused) return;
+        if (gameState.gameOver) return;
+
+        if ( event.button === 2 ) {
+            // Right mouse released
+            disableAimControls();
+            setThirdPersonCamera();
+        }
+    };
+    
+    document.addEventListener('mousedown', onMouseClick, false);
+    document.addEventListener('mouseup', onMouseRelease, false);
+}
+
+
+function setLinkThirdCameraControls() {
+    
+    linkThirdCameraControls = new CameraOrbitControls( thirdPersonCameraPivot, document.body );
+    
+    // Settings
+    linkThirdCameraControls.enabled = true; 
+    gameControls.push(linkThirdCameraControls);
+}
+
+function setLinkFirstCameraControls() {
+    const link = models.link.root;
+    linkFirstCameraControls = new CameraPointerLockControls( link, document.body );
+
+    linkFirstCameraControls.enabled = false;    
+    gameControls.push(linkFirstCameraControls);
 }
 
 function setLinkMovementControls() {
-
     const link = models.link.root;
-    playerControls = new MovementPointerLockControls( link, document.body );
+    linkMovementControls = new MovementPointerLockControls( link, document.body );
     
-    playerControls.enableMouseVertical = false;
-
     var onKeyDown = function ( event ) {
         if ( gameState.gameOver ) return;
         if ( gameState.gamePaused ) return;
@@ -1040,11 +1089,6 @@ function setLinkMovementControls() {
             case 68: // d
                 linkMovement.right = true;
                 break;
-
-            // case 32: // space
-            //     if ( canJump === true ) linkVelocity.y += linkJumpSpeed;
-            //     canJump = false;
-            //     break;
         }
     };
 
@@ -1072,15 +1116,13 @@ function setLinkMovementControls() {
             case 68: // d
                 linkMovement.right = false;
                 break;
-
         }
-
     };
 
     document.addEventListener( 'keydown', onKeyDown, false );
     document.addEventListener( 'keyup', onKeyUp, false );
 
-    gameControls.push(playerControls);
+    gameControls.push(linkMovementControls);
 }
 
 function setLinkAimControls() {
@@ -1093,67 +1135,73 @@ function setLinkAimControls() {
     const head = link.joints.upper.head;
 
     // Controls for left and right arm (and bow)
-    var bowControlsArmL = new AimPointerLockControls( armL, document.body );
-    var bowControlsArmR = new AimPointerLockControls( armR, document.body );
+    aimControlsArmL = new AimPointerLockControls( armL, document.body );
+    aimControlsArmR = new AimPointerLockControls( armR, document.body );
     
     // Controls for link's head
-    var headControls = new HeadPointerLockControls( head, document.body, )
+    aimControlsHead = new HeadPointerLockControls( head, document.body, )
 
     // Settings
-    bowControlsArmR.inverted = true;
-    bowControlsArmR.correctX = true;
-    bowControlsArmR.correction = 0.002;
+    aimControlsArmR.inverted = true;
+    aimControlsArmR.correctX = true;
+    aimControlsArmR.correction = 0.002;
 
-    headControls.increment = 0.05;
+    aimControlsHead.increment = 0.05;
+
+    // Initially disabled, enabled when in fps mode
+    aimControlsArmL.enabled = false;
+    aimControlsArmR.enabled = false;
+    aimControlsHead.enabled = false;
     
     // Assign listeners
-    bowControlsArmL.minPolarAngle = -0.75 * Math.PI;
-    bowControlsArmL.maxPolarAngle = -0.25 * Math.PI;
-    gameControls.push(bowControlsArmL);
+    aimControlsArmL.minPolarAngle = -0.75 * Math.PI;
+    aimControlsArmL.maxPolarAngle = -0.25 * Math.PI;
+    gameControls.push(aimControlsArmL);
 
-    bowControlsArmR.minPolarAngle = 0.25 * Math.PI;
-    bowControlsArmR.maxPolarAngle = 0.75 * Math.PI;
-    gameControls.push(bowControlsArmR);
+    aimControlsArmR.minPolarAngle = 0.25 * Math.PI;
+    aimControlsArmR.maxPolarAngle = 0.75 * Math.PI;
+    gameControls.push(aimControlsArmR);
 
-    headControls.minPolarAngle = -0.1 * Math.PI;
-    headControls.maxPolarAngle = 0.25 * Math.PI;
-    gameControls.push(headControls);
-}
-
-function setOrbitControls() {
-    var orbitControls = new OrbitControls( thirdPersonCamera, renderer.domElement );
-    orbitControls.minPolarAngle = 0.0;
-    orbitControls.maxPolarAngle = Math.PI * 0.5 - 0.1;
-    orbitControls.target.set(0, 0, 0);
-    orbitControls.update();
-
-    gameControls.push(orbitControls);
+    aimControlsHead.minPolarAngle = -0.1 * Math.PI;
+    aimControlsHead.maxPolarAngle = 0.25 * Math.PI;
+    gameControls.push(aimControlsHead);
 }
 
 function setShootControls () {
-    var onClickPressed = function (event) {
+    var onMouseClick = function (event) {
         if (gameState.gamePaused) return;
-        if (!gameState.canShoot) return;
-        if (gameState.shooting) return;
+        if (gameState.gameOver) return;
 
-        gameState.shooting = true;
-        gameState.shootInitTime = performance.now();
-        startNockingArrowAnimation();
+        if ( event.button === 0 ){
+            // Left mouse clicked
+            
+            if (!gameState.canShoot) return;
+            if (gameState.nocking) return;
+
+            gameState.nocking = true;
+            gameState.nockingInitTime = performance.now();
+            startNockingArrowAnimation();
+        }
     };
 
-    var onClickRelease = function (event) {
+    var onMouseRelease = function (event) {
         if (gameState.gamePaused) return;
-        if (!gameState.shooting) return;
+        if (gameState.gameOver) return;
 
-        gameState.canShoot = false;
-        gameState.shootFinalTime = performance.now();
-        gameState.shooting = false;
-        startArrowAnimation();
+        if ( event.button === 0 ) {
+            // Left mouse released
+
+            if (!gameState.nocking) return;
+
+            gameState.canShoot = false;
+            gameState.nockingFinalTime = performance.now();
+            gameState.nocking = false;
+            startArrowAnimation();
+        }
     };
 
-    document.addEventListener('mousedown', onClickPressed, false);
-    document.addEventListener('mouseup', onClickRelease, false);
-    gameControls.push(playerControls);
+    document.addEventListener('mousedown', onMouseClick, false);
+    document.addEventListener('mouseup', onMouseRelease, false);
 }
 
 function setListeners(controls) {
@@ -1173,11 +1221,12 @@ function setListeners(controls) {
 }
 
 function setControls() {
-    // setOrbitControls();
     setLinkMovementControls();
+    setLinkThirdCameraControls();
+    setLinkFirstCameraControls();
     setLinkAimControls();
     setShootControls();
-    setCameraControls();
+    setCameraSwitchControls();
 
     gameControls.forEach(
         (controls) => {
@@ -1188,6 +1237,22 @@ function setControls() {
     setColliders();
 
     gameState.controlsSet = true;
+}
+
+function enableAimControls() {
+    aimControlsArmL.enabled = true;
+    aimControlsArmR.enabled = true;
+    aimControlsHead.enabled = true;
+
+    linkMovementControls.enableMouseVertical = false;
+}
+
+function disableAimControls() {
+    aimControlsArmL.enabled = false;
+    aimControlsArmR.enabled = false;
+    aimControlsHead.enabled = false;
+
+    linkMovementControls.enableMouseVertical = true;
 }
 
 function lockControls() {
@@ -1211,7 +1276,7 @@ function onWindowResize() {
 
 
 // Link
-function restoreLinkLowerLimbs() {
+function restoreLinkLowerJoints() {
     const linkJoints = models.link.joints;
 
     linkJoints.lower.left.thigh.rotation.copy(linkRestJoints.lower.left.thigh);
@@ -1220,7 +1285,7 @@ function restoreLinkLowerLimbs() {
     linkJoints.lower.right.shin.rotation.copy(linkRestJoints.lower.right.shin);
 }
 
-function restoreLinkUpperLimbs() {
+function restoreLinkUpperJoints() {
     const link = models.link;
 
     const spine001 = link.joints.upper.spine001;
@@ -1268,8 +1333,8 @@ function animateLinkMovement(time) {
     }
 
     // Update position with velocity
-    playerControls.moveRight( linkVelocity.x * dt );
-    playerControls.moveForward( linkVelocity.z * dt );
+    linkMovementControls.moveRight( linkVelocity.x * dt );
+    linkMovementControls.moveForward( linkVelocity.z * dt );
     
     // Check map boundaries
     if (models.link.root.position.z >= mapLimitForward) {
@@ -1295,16 +1360,16 @@ function animateLinkMovement(time) {
     } else {
         // Stop animation if no movement
         stopLinkWalkAnimation();
-        restoreLinkLowerLimbs();
+        restoreLinkLowerJoints();
     }
 
     // Update vertical position
-    playerControls.getObject().position.y += ( linkVelocity.y * dt ); 
+    linkMovementControls.getObject().position.y += ( linkVelocity.y * dt ); 
 
     // Check vertical position (no infinite falling)
-    if ( playerControls.getObject().position.y < 0 ) {
+    if ( linkMovementControls.getObject().position.y < 0 ) {
         linkVelocity.y = 0;
-        playerControls.getObject().position.y = 0;
+        linkMovementControls.getObject().position.y = 0;
         // canJump = true;
     } else {
         linkVelocity.y -= g * linkMass * dt; 
@@ -1323,7 +1388,7 @@ function startLinkWalkAnimation() {
     // Set initial position for lower limbs
     if ( linkMovementTweens.length != 0 ) return;
     
-    restoreLinkLowerLimbs();
+    restoreLinkLowerJoints();
 
     // Params
     const time1 = 200;
@@ -1497,7 +1562,7 @@ function computeArrowDirection() {
 }
 
 function computeArrowInitialVelocity(direction) {
-    var charge = (gameState.shootFinalTime - gameState.shootInitTime) * 0.001;
+    var charge = (gameState.nockingFinalTime - gameState.nockingInitTime) * 0.001;
     var deltaT = Math.min(charge, maxCharge);
 
     var impulse = arrowForce * deltaT;
@@ -1543,12 +1608,12 @@ function startArrowAnimation() {
     )
     .onComplete(
         () => {
-            gameState.shooting = false;
+            gameState.nocking = false;
             gameState.arrowFlying = true;
 
             currentCamera = arrowCamera;
             handR.attach(bowString);
-            restoreLinkUpperLimbs();
+            restoreLinkUpperJoints();
         }
     );
     
@@ -1603,15 +1668,16 @@ function stopArrowFlight() {
 
     var delayedStopArrowTween = new TWEEN.Tween({})
     .to({}, 1000)
-    .onComplete(
-        () => {
-            currentCamera = cameras[currentCameraIdx];
-            buildNewArrow();
-            gameState.canShoot = true;
-            
-            checkGameOver();
-        })
-    .start();
+    .onComplete(() => 
+    {
+        buildNewArrow();
+        setThirdPersonCamera();
+        
+        gameState.canShoot = true;   
+        checkGameOver();
+    });
+    
+    delayedStopArrowTween.start();
 }
 
 // Target
