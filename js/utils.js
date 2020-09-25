@@ -17,8 +17,8 @@ export function dumpObject(obj, lines = [], isLast = true, prefix = '') {
 }
 
 export function degToRad(degrees) {
-    return (Math.PI / 180.0) * degrees;
-}
+    return degrees * (Math.PI / 180);
+};
 
 export function degToRad3(degrees3) {
     var rad = [];

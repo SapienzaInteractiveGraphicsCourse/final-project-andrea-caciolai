@@ -1,11 +1,9 @@
 import * as THREE from '../lib/three.js/build/three.module.js'
 import {GLTFLoader} from '../lib/three.js/examples/jsm/loaders/GLTFLoader.js'
-import { OrbitControls } from '../lib/three.js/examples/jsm/controls/OrbitControls.js';
 
-import { MovementPointerLockControls, CameraOrbitControls, CameraPointerLockControls, AimPointerLockControls, HeadPointerLockControls } from './controls.js';
+import { CameraOrbitControls, CameraPointerLockControls, AimPointerLockControls, HeadPointerLockControls } from './controls.js';
 import TWEEN from '../lib/tween.js/dist/tween.esm.js'
 
-import {SceneUtils} from '../lib/three.js/examples/jsm/utils/SceneUtils.js'
 import {SkeletonUtils} from '../lib/three.js/examples/jsm/utils/SkeletonUtils.js';
 import * as UTILS from './utils.js'
 
@@ -25,6 +23,10 @@ var gameState = {
     modelsLoaded: false,
     sceneBuilt: false,
     controlsSet: false,
+    canWalk: true,
+    walking: true,
+    canAim: false,
+    aiming: false,
     canShoot: false,
     nocking: false,
     nockingInitTime: null,
@@ -49,6 +51,7 @@ var thirdPersonCameraPivot;
 var arrowCamera;
 
 var cameras;
+var trees = [];
 
 // Camera parameters
 const fov = 45;
@@ -214,8 +217,7 @@ var linkRestJoints = {
 }
 
 const floorFriction = 10.0;
-const linkMovementSpeed = 100.0;
-const linkMass = 100.0;
+const linkMovementSpeed = 500.0;
 
 const g = 9.81;
 const linkMovementThreshold = 0.01*linkMovementSpeed;
@@ -261,7 +263,6 @@ var targetMovementTweens = [];
 
 // Controls variables
 
-var linkMovementControls;
 var linkThirdCameraControls;
 var linkFirstCameraControls;
 
@@ -556,6 +557,7 @@ function buildTree(idx, position, rotation) {
     tree.rotation.set(...rotation);
 
     scene.add( tree );
+    trees.push( tree );
 }
 
 function buildTrees() {
@@ -867,7 +869,8 @@ function pauseGame() {
 }
 
 // Collisions
-function handleLinkCollisionObject(collidedObject) {
+function handleLinkCollision(collidedObject) {
+    console.log(collidedObject);
     const link = models.link.root;
     const linkPosition = link.position;
     const objPosition = collidedObject.position;
@@ -903,22 +906,16 @@ function handleLinkCollisionObject(collidedObject) {
     }
 }
 
-function handleLinkCollision(collidedObject) {
-    if ( collidedObject.type === "Object3D" ) {
-        handleLinkCollisionObject(collidedObject);
-    } else {
-        console.log("ERROR!");
-    }
-}
-
 function handleArrowCollision(collidedObject) {
-    if ( gameState.arrowFlying ) {
+    if ( !gameState.arrowFlying ) return;
+
+    if ( collidedObject.name === "Bullseye" ) {
         console.log("Target hit!");
         registerArrowHit();
-        stopArrowFlight();
-
-        models.target.root.attach( models.arrow.root );
     }
+
+    stopArrowFlight();
+    collidedObject.attach( models.arrow.root );
 }
 
 function registerArrowHit() {
@@ -964,6 +961,8 @@ function setLinkColliders() {
 
     const collidableObjects = [target];
 
+    // trees.forEach((tree) => {collidableObjects.push(tree)});
+
     models.link.colliders = [];
     models.link.colliders.push(buildObjectsCollider(link, collidableObjects, handleLinkCollision));
 
@@ -976,6 +975,8 @@ function setArrowColliders() {
     const collideableTarget = target.getObjectByName('Bullseye');
 
     const collideableObjects = [collideableTarget];
+
+    // trees.forEach((tree) => {collideableObjects.push(tree)});
 
     models.arrow.colliders = [];
     models.arrow.colliders.push(buildObjectsCollider(arrow, collideableObjects, handleArrowCollision));
@@ -1016,14 +1017,17 @@ function setThirdPersonCamera() {
     document.querySelector( '#crosshair' ).hidden = true;
 }
 
-function setCameraSwitchControls() {
+function setAimCameraControls() {
     var onMouseClick = function (event) {
         if (gameState.gamePaused) return;
         if (gameState.gameOver) return;
+        if (!gameState.canAim) return;
 
         if (event.button === 2) {
             // Right mouse clicked
             enableAimControls();
+            gameState.aiming = true;
+            gameState.canAim = false;
             setFirstPersonCamera();
         }
     };
@@ -1031,10 +1035,13 @@ function setCameraSwitchControls() {
     var onMouseRelease = function (event) {
         if (gameState.gamePaused) return;
         if (gameState.gameOver) return;
+        if (!gameState.aiming) return;
 
         if ( event.button === 2 ) {
             // Right mouse released
             disableAimControls();
+            gameState.aiming = false;
+            gameState.canAim = true;
             setThirdPersonCamera();
         }
     };
@@ -1043,13 +1050,15 @@ function setCameraSwitchControls() {
     document.addEventListener('mouseup', onMouseRelease, false);
 }
 
-
 function setLinkThirdCameraControls() {
     
     linkThirdCameraControls = new CameraOrbitControls( thirdPersonCameraPivot, document.body );
     
     // Settings
-    linkThirdCameraControls.enabled = true; 
+    linkThirdCameraControls.enabled = true;
+    linkThirdCameraControls.minPolarAngle = -0.25*Math.PI; // radians
+    linkThirdCameraControls.maxPolarAngle = 0.15*Math.PI; // radians
+    
     gameControls.push(linkThirdCameraControls);
 }
 
@@ -1063,7 +1072,6 @@ function setLinkFirstCameraControls() {
 
 function setLinkMovementControls() {
     const link = models.link.root;
-    linkMovementControls = new MovementPointerLockControls( link, document.body );
     
     var onKeyDown = function ( event ) {
         if ( gameState.gameOver ) return;
@@ -1121,8 +1129,6 @@ function setLinkMovementControls() {
 
     document.addEventListener( 'keydown', onKeyDown, false );
     document.addEventListener( 'keyup', onKeyUp, false );
-
-    gameControls.push(linkMovementControls);
 }
 
 function setLinkAimControls() {
@@ -1175,10 +1181,16 @@ function setShootControls () {
         if ( event.button === 0 ){
             // Left mouse clicked
             
+            // if (!gameState.aiming) return;
             if (!gameState.canShoot) return;
             if (gameState.nocking) return;
 
             gameState.nocking = true;
+            gameState.walking = false;
+            gameState.canWalk = false;
+            
+            stopLinkWalkAnimation();
+            
             gameState.nockingInitTime = performance.now();
             startNockingArrowAnimation();
         }
@@ -1194,8 +1206,9 @@ function setShootControls () {
             if (!gameState.nocking) return;
 
             gameState.canShoot = false;
-            gameState.nockingFinalTime = performance.now();
             gameState.nocking = false;
+            
+            gameState.nockingFinalTime = performance.now();
             startArrowAnimation();
         }
     };
@@ -1226,7 +1239,7 @@ function setControls() {
     setLinkFirstCameraControls();
     setLinkAimControls();
     setShootControls();
-    setCameraSwitchControls();
+    setAimCameraControls();
 
     gameControls.forEach(
         (controls) => {
@@ -1243,16 +1256,12 @@ function enableAimControls() {
     aimControlsArmL.enabled = true;
     aimControlsArmR.enabled = true;
     aimControlsHead.enabled = true;
-
-    linkMovementControls.enableMouseVertical = false;
 }
 
 function disableAimControls() {
     aimControlsArmL.enabled = false;
     aimControlsArmR.enabled = false;
     aimControlsHead.enabled = false;
-
-    linkMovementControls.enableMouseVertical = true;
 }
 
 function lockControls() {
@@ -1288,13 +1297,15 @@ function restoreLinkLowerJoints() {
 function restoreLinkUpperJoints() {
     const link = models.link;
 
+    const head = link.joints.upper.head;
     const spine001 = link.joints.upper.spine001;
     const spine002 = link.joints.upper.spine002;
     const spine003 = link.joints.upper.spine003;
+    
     const armL = link.joints.upper.left.arm;
     const armR = link.joints.upper.right.arm;
+    const forearmL = link.joints.upper.left.forearm;
     const forearmR = link.joints.upper.right.forearm;
-    const head = link.joints.upper.head;
 
     spine001.rotation.copy(linkRestJoints.upper.spine001);
     spine002.rotation.copy(linkRestJoints.upper.spine002);
@@ -1303,10 +1314,16 @@ function restoreLinkUpperJoints() {
 
     armL.rotation.copy(linkRestJoints.upper.left.arm);
     armR.rotation.copy(linkRestJoints.upper.right.arm);
+    forearmL.rotation.copy(linkRestJoints.upper.left.forearm);
     forearmR.rotation.copy(linkRestJoints.upper.right.forearm);
 }
 
 function animateLinkMovement(time) {
+    var movSpeed = linkMovementSpeed;
+    
+    if (!gameState.canWalk) return;
+    if (gameState.aiming) movSpeed /= 5;
+
     var dt = ( time - prevTime ) / 1000;
 
     // Apply friction
@@ -1320,21 +1337,21 @@ function animateLinkMovement(time) {
 
     // Update velocity (with collision check)
     if ( linkMovement.forward && !linkCollision.forward ) {
-        linkVelocity.z += linkDirection.z * linkMovementSpeed * dt;
+        linkVelocity.z += linkDirection.z * movSpeed * dt;
     }
     if ( linkMovement.backward && !linkCollision.backward ) {
-        linkVelocity.z += linkDirection.z * linkMovementSpeed * dt;
+        linkVelocity.z += linkDirection.z * movSpeed * dt;
     }
     if ( linkMovement.left && !linkCollision.left ) {
-        linkVelocity.x += linkDirection.x * linkMovementSpeed * dt;
+        linkVelocity.x += linkDirection.x * movSpeed * dt;
     }
     if ( linkMovement.right && !linkCollision.right ) {
-        linkVelocity.x += linkDirection.x * linkMovementSpeed * dt;
+        linkVelocity.x += linkDirection.x * movSpeed * dt;
     }
 
     // Update position with velocity
-    linkMovementControls.moveRight( linkVelocity.x * dt );
-    linkMovementControls.moveForward( linkVelocity.z * dt );
+    models.link.root.position.x += linkVelocity.x * dt;
+    models.link.root.position.z -= linkVelocity.z * dt;
     
     // Check map boundaries
     if (models.link.root.position.z >= mapLimitForward) {
@@ -1354,25 +1371,17 @@ function animateLinkMovement(time) {
         linkVelocity.x = 0.0;
     }
 
+    // Animate
     if ( (Math.abs(linkVelocity.z) >= linkMovementThreshold) || (Math.abs(linkVelocity.x) >= linkMovementThreshold) ) {
-        // Start animation if movement
-        startLinkWalkAnimation();
+        if ( !gameState.walking ) {
+            // Start animation if movement
+            gameState.walking = true;
+            startLinkWalkAnimation();
+        }
     } else {
         // Stop animation if no movement
+        gameState.walking = false;
         stopLinkWalkAnimation();
-        restoreLinkLowerJoints();
-    }
-
-    // Update vertical position
-    linkMovementControls.getObject().position.y += ( linkVelocity.y * dt ); 
-
-    // Check vertical position (no infinite falling)
-    if ( linkMovementControls.getObject().position.y < 0 ) {
-        linkVelocity.y = 0;
-        linkMovementControls.getObject().position.y = 0;
-        // canJump = true;
-    } else {
-        linkVelocity.y -= g * linkMass * dt; 
     }
 
     // Reset collisions
@@ -1382,123 +1391,216 @@ function animateLinkMovement(time) {
     linkCollision.right = false;
 }
 
-function startLinkWalkAnimation() {
-    const linkJoints = models.link.joints;
-
-    // Set initial position for lower limbs
-    if ( linkMovementTweens.length != 0 ) return;
-    
+function startLinkLowerWalkAnimation() {
     restoreLinkLowerJoints();
+    const linkJoints = models.link.joints;
 
     // Params
     const time1 = 200;
     const time2 = 400;
     const time3 = 200;
     
-    const thighAngle1 = 30;
+    const thighLAngle = linkJoints.lower.left.thigh.rotation.x;
+    const thighRAngle = linkJoints.lower.right.thigh.rotation.x;
+    const shinLAngle = linkJoints.lower.left.shin.rotation.x;
+    const shinRAngle = linkJoints.lower.right.shin.rotation.x;
+
+    const thighLAngle1 = UTILS.degToRad(30);
+    const thighRAngle1 = UTILS.degToRad(-30);
     const shinLAngle1 = 0;
-    const shingRAngle1 = -30;
+    const shinRAngle1 = UTILS.degToRad(30);
     
-    const thighAngle2 = -30;
-    const shinLAngle2 = 30;
+    const thighLAngle2 = UTILS.degToRad(-30);
+    const thighRAngle2 = UTILS.degToRad(30);
+    const shinLAngle2 = UTILS.degToRad(30);
     const shinRAngle2 = 0;
     
-    const thighAngle3 = 0;
+    const thighLAngle3 = 0
+    const thighRAngle3 = 0;
     const shinLAngle3 = 0;
     const shinRAngle3 = 0;
 
-    // Thigh tweens
-    var thigh = {angle: 0.0};
-    var thighTween1 = new TWEEN.Tween(thigh)
-	.to({ angle: thighAngle1}, time1) 
-	.easing(TWEEN.Easing.Quadratic.In)
+    // Tweens
+    var upper = {thighL: 0.0, thighR: 0.0, shinL: 0.0, shinR: 0.0};
+    var upperTween1 = new TWEEN.Tween(upper)
+	.to({ thighL: thighLAngle1, thighR: thighRAngle1, shinL: shinLAngle1, shinR: shinRAngle1}, time1) 
 	.onUpdate( 
             () => {
-                linkJoints.lower.left.thigh.rotation.x = UTILS.degToRad(180 +  thigh.angle ); // forward
-                linkJoints.lower.right.thigh.rotation.x = UTILS.degToRad(180 - 1.0 * thigh.angle ); // backward
-            }
-    );
+                linkJoints.lower.left.thigh.rotation.x = thighLAngle + upper.thighL; 
+                linkJoints.lower.right.thigh.rotation.x = thighRAngle + upper.thighR; 
 
-    var thighTween2 = new TWEEN.Tween(thigh)
-	.to({ angle: thighAngle2}, time2) 
-	.easing(TWEEN.Easing.Quadratic.In)
-	.onUpdate( 
-            () => {
-                linkJoints.lower.left.thigh.rotation.x = UTILS.degToRad(180 +  thigh.angle ); // forward
-                linkJoints.lower.right.thigh.rotation.x = UTILS.degToRad(180 -1.0 * thigh.angle ); // backward
-            }
-    );
-
-    var thighTween3 = new TWEEN.Tween(thigh)
-	.to({ angle: thighAngle3}, time3) 
-	.easing(TWEEN.Easing.Quadratic.In)
-	.onUpdate( 
-            () => {
-                linkJoints.lower.left.thigh.rotation.x = UTILS.degToRad(180 +  thigh.angle ); // forward
-                linkJoints.lower.right.thigh.rotation.x = UTILS.degToRad(180 -1.0 * thigh.angle ); // backward
+                linkJoints.lower.left.shin.rotation.x = shinLAngle + upper.shinL; 
+                linkJoints.lower.right.shin.rotation.x = shinRAngle + upper.shinR;
             }
     );
         
-
-    // Shin tweens
-    var shin = {angleL: 0.0, angleR: 0.0};
-    var shinTween1 = new TWEEN.Tween(shin)
-	.to({ angleL: shinLAngle1, angleR: shingRAngle1 }, time1) 
-	.easing(TWEEN.Easing.Quadratic.Out)
+    var upperTween2 = new TWEEN.Tween(upper)
+	.to({ thighL: thighLAngle2, thighR: thighRAngle2, shinL: shinLAngle2, shinR: shinRAngle2}, time2) 
 	.onUpdate( 
             () => {
-                linkJoints.lower.left.shin.rotation.x = UTILS.degToRad( shin.angleL ); // forward
-                linkJoints.lower.right.shin.rotation.x = UTILS.degToRad( shin.angleR ); // backward
+                linkJoints.lower.left.thigh.rotation.x = thighLAngle + upper.thighL; 
+                linkJoints.lower.right.thigh.rotation.x = thighRAngle + upper.thighR; 
+
+                linkJoints.lower.left.shin.rotation.x = shinLAngle + upper.shinL; 
+                linkJoints.lower.right.shin.rotation.x = shinRAngle + upper.shinR;
             }
-	);
-    
-    var shinTween2 = new TWEEN.Tween(shin)
-	.to({ angleL: shinLAngle2, angleR: shinRAngle2 }, time2) 
-	.easing(TWEEN.Easing.Quadratic.Out)
+    );
+
+    var upperTween3 = new TWEEN.Tween(upper)
+	.to({ thighL: thighLAngle3, thighR: thighRAngle3, shinL: shinLAngle3, shinR: shinRAngle3}, time3) 
 	.onUpdate( 
             () => {
-                linkJoints.lower.left.shin.rotation.x = UTILS.degToRad( shin.angleL ); // forward
-                linkJoints.lower.right.shin.rotation.x = UTILS.degToRad( shin.angleR ); // backward
+                linkJoints.lower.left.thigh.rotation.x = thighLAngle + upper.thighL; 
+                linkJoints.lower.right.thigh.rotation.x = thighRAngle + upper.thighR; 
+
+                linkJoints.lower.left.shin.rotation.x = shinLAngle + upper.shinL; 
+                linkJoints.lower.right.shin.rotation.x = shinRAngle + upper.shinR;
             }
-	);
-    
-    var shinTween3 = new TWEEN.Tween(shin)
-	.to({ angleL: shinLAngle3, angleR: shinRAngle3 }, time3) 
-	.easing(TWEEN.Easing.Quadratic.Out)
-	.onUpdate( 
-            () => {
-                linkJoints.lower.left.shin.rotation.x = UTILS.degToRad( shin.angleL ); // forward
-                linkJoints.lower.right.shin.rotation.x = UTILS.degToRad( shin.angleR ); // backward
-            }
-	);
+    );
 
-    // Add tweens to list
-    linkMovementTweens.push(thighTween1);
-    linkMovementTweens.push(shinTween1);
+    // Chaining
+    upperTween1.chain(upperTween2);
+    upperTween2.chain(upperTween3);
+    upperTween3.chain(upperTween1);
 
-    linkMovementTweens.push(thighTween2);
-    linkMovementTweens.push(shinTween2);
-    
-    linkMovementTweens.push(thighTween3);
-    linkMovementTweens.push(shinTween3);
+    // Start
+    linkMovementTweens.push(upperTween1);
+    linkMovementTweens.push(upperTween2);
+    linkMovementTweens.push(upperTween3);
 
-    // Start tweens in a cyclic fashion
-    thighTween1.onComplete( () => { thighTween2.start(); } );
-    shinTween1.onComplete( () => { shinTween2.start(); } );
-    
-    thighTween2.onComplete( () => { thighTween3.start(); } );
-    shinTween2.onComplete( () => { shinTween3.start(); } );
-    
-    thighTween3.onComplete( () => { thighTween1.start(); } );
-    shinTween3.onComplete( () => { shinTween1.start(); } );
+    upperTween1.start();
+}
 
-    thighTween1.start();
-    shinTween1.start();
+function linkInitialWalkUpperJoints() {
+    const linkJoints = models.link.joints;
+    
+    // Detach bow string from handR
+    models.bow.root.attach(models.bow.joints.string);
+
+    linkJoints.upper.spine003.rotation.y = 0.0;
+    
+    const armRJoints = UTILS.degToRad3([30, 0, 90]);
+    linkJoints.upper.right.arm.rotation.x += armRJoints[0];
+    linkJoints.upper.right.arm.rotation.y += armRJoints[1];
+    linkJoints.upper.right.arm.rotation.z += armRJoints[2];
+
+    const forearmRJoints = UTILS.degToRad3([-60, 0, -30]);
+    linkJoints.upper.right.forearm.rotation.x += forearmRJoints[0];
+    linkJoints.upper.right.forearm.rotation.y += forearmRJoints[1];
+    linkJoints.upper.right.forearm.rotation.z += forearmRJoints[2];
+
+    const armLJoints = UTILS.degToRad3([30, 0, -90]);
+    linkJoints.upper.left.arm.rotation.x += armLJoints[0];
+    linkJoints.upper.left.arm.rotation.y += armLJoints[1];
+    linkJoints.upper.left.arm.rotation.z += armLJoints[2];
+
+    const forearmLJoints = UTILS.degToRad3([0, 0, 60]);
+    linkJoints.upper.left.forearm.rotation.x += forearmLJoints[0];
+    linkJoints.upper.left.forearm.rotation.y += forearmLJoints[1];
+    linkJoints.upper.left.forearm.rotation.z += forearmLJoints[2];
+}
+
+function startLinkUpperWalkAnimation() {
+    linkInitialWalkUpperJoints();
+    
+    const linkJoints = models.link.joints;
+
+    const spineAngle = linkJoints.upper.spine003.rotation.y;
+    const headAngle = linkJoints.upper.head.rotation.y;
+
+    const armRAngle = linkJoints.upper.right.arm.rotation.z;
+    const forearmRAngle = linkJoints.upper.right.forearm.rotation.z;
+    const armLAngle = linkJoints.upper.left.arm.rotation.z;
+    const forearmLAngle = linkJoints.upper.left.forearm.rotation.z;
+
+    // Params
+    const time1 = 200;
+    const time2 = 400;
+    const time3 = 200;
+    
+    const spineAngle1 = UTILS.degToRad(15);
+    const armAngle1 = UTILS.degToRad(30);
+    const forearmAngle1 = UTILS.degToRad(15);
+    
+    const spineAngle2 = UTILS.degToRad(-15);
+    const armAngle2 = UTILS.degToRad(-30);
+    const forearmAngle2 = UTILS.degToRad(-15);
+    
+    const spineAngle3 = 0.0;
+    const armAngle3 = 0.0;
+    const forearmAngle3 = 0.0;
+
+    // Tweens
+    var upper = {arm: 0.0, forearm: 0.0, spine: 0.0};
+    var upperTween1 = new TWEEN.Tween(upper)
+    .to({arm: armAngle1, forearm: forearmAngle1, spine: spineAngle1}, time1)
+    .onUpdate(() => {
+        linkJoints.upper.right.arm.rotation.z = armRAngle + upper.arm;
+        linkJoints.upper.left.arm.rotation.z = armLAngle + upper.arm;
+
+        linkJoints.upper.right.forearm.rotation.z = forearmRAngle + upper.forearm;
+        linkJoints.upper.left.forearm.rotation.z = forearmLAngle + upper.forearm;
+
+        linkJoints.upper.spine003.rotation.y = spineAngle + upper.spine;
+        linkJoints.upper.head.rotation.y = headAngle - upper.spine;
+    });
+
+    var upperTween2 = new TWEEN.Tween(upper)
+    .to({arm: armAngle2, forearm: forearmAngle2, spine: spineAngle2}, time2)
+    .onUpdate(() => {
+        linkJoints.upper.right.arm.rotation.z = armRAngle + upper.arm;
+        linkJoints.upper.left.arm.rotation.z = armLAngle + upper.arm;
+
+        linkJoints.upper.right.forearm.rotation.z = forearmRAngle + upper.forearm;
+        linkJoints.upper.left.forearm.rotation.z = forearmLAngle + upper.forearm;
+
+        linkJoints.upper.spine003.rotation.y = spineAngle + upper.spine;
+        linkJoints.upper.head.rotation.y = headAngle - upper.spine;
+    });
+
+    var upperTween3 = new TWEEN.Tween(upper)
+    .to({arm: armAngle3, forearm: forearmAngle3, spine: spineAngle3}, time3)
+    .onUpdate(() => {
+        linkJoints.upper.right.arm.rotation.z = armRAngle + upper.arm;
+        linkJoints.upper.left.arm.rotation.z = armLAngle + upper.arm;
+
+        linkJoints.upper.right.forearm.rotation.z = forearmRAngle + upper.forearm;
+        linkJoints.upper.left.forearm.rotation.z = forearmLAngle + upper.forearm;
+
+        linkJoints.upper.spine003.rotation.y = spineAngle + upper.spine;
+        linkJoints.upper.head.rotation.y = headAngle - upper.spine;
+    });
+
+    // Chaining
+    upperTween1.chain(upperTween2);
+    upperTween2.chain(upperTween3);
+    upperTween3.chain(upperTween1);
+
+    // Starting all
+    linkMovementTweens.push(upperTween1);
+    linkMovementTweens.push(upperTween2);
+    linkMovementTweens.push(upperTween3);
+
+    upperTween1.start();
+}
+
+function startLinkWalkAnimation() {
+
+    // Set initial position for lower limbs
+    if ( linkMovementTweens.length != 0 ) return;
+    
+    startLinkLowerWalkAnimation();
+    startLinkUpperWalkAnimation();
 }
 
 function stopLinkWalkAnimation() {
     UTILS.stopTweens(linkMovementTweens);
     linkMovementTweens = [];
+    restoreLinkLowerJoints();
+    restoreLinkUpperJoints();
+    
+    // Attach bow string back to handR
+    models.link.joints.upper.right.hand.attach(models.bow.joints.string);
 }
 
 // Arrow
@@ -1673,7 +1775,11 @@ function stopArrowFlight() {
         buildNewArrow();
         setThirdPersonCamera();
         
-        gameState.canShoot = true;   
+        gameState.canShoot = true; 
+        gameState.aiming = false;
+        gameState.canAim = true;
+        gameState.canWalk = true;
+
         checkGameOver();
     });
     
@@ -1807,10 +1913,10 @@ function render(time) {
             animateArrowFlight(time);
         }
     
-        prevTime = time;
-        renderer.render(scene, currentCamera);
+        prevTime = time;    
     }
 
+    renderer.render(scene, currentCamera);
     requestAnimationFrame(render);
 }
 
@@ -1849,6 +1955,9 @@ export function main() {
         
         lockControls();
         startTargetAnimation();
+        
+        gameState.canWalk = true;
+        gameState.canAim = true;
         gameState.canShoot = true;
     }
     

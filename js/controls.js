@@ -8,131 +8,6 @@ import {
 
 import * as UTILS from "./utils.js";
 
-var MovementPointerLockControls = function ( object, domElement ) {
-
-	if ( domElement === undefined ) {
-
-		console.warn( 'THREE.MovementPointerLockControls: The second parameter "domElement" is now mandatory.' );
-		domElement = document.body;
-
-	}
-
-	this.domElement = domElement;
-	this.isLocked = false;
-    
-    //
-	// internals
-	//
-
-	var scope = this;
-
-	var lockEvent = { type: 'lock' };
-	var unlockEvent = { type: 'unlock' };
-
-	var vec = new Vector3();
-
-	function onPointerlockChange() {
-
-		if ( scope.domElement.ownerDocument.pointerLockElement === scope.domElement ) {
-
-			scope.dispatchEvent( lockEvent );
-
-			scope.isLocked = true;
-
-		} else {
-
-			scope.dispatchEvent( unlockEvent );
-
-			scope.isLocked = false;
-
-		}
-
-	}
-
-	function onPointerlockError() {
-
-		console.error( 'THREE.MovementPointerLockControls: Unable to use Pointer Lock API' );
-
-	}
-
-	this.connect = function () {
-
-		scope.domElement.ownerDocument.addEventListener( 'pointerlockchange', onPointerlockChange, false );
-		scope.domElement.ownerDocument.addEventListener( 'pointerlockerror', onPointerlockError, false );
-
-	};
-
-	this.disconnect = function () {
-
-		scope.domElement.ownerDocument.removeEventListener( 'mousemove', onMouseMove, false );
-		scope.domElement.ownerDocument.removeEventListener( 'pointerlockchange', onPointerlockChange, false );
-		scope.domElement.ownerDocument.removeEventListener( 'pointerlockerror', onPointerlockError, false );
-
-	};
-
-	this.dispose = function () {
-
-		this.disconnect();
-
-	};
-
-	this.getObject = function () { // retaining this method for backward compatibility
-
-		return object;
-
-	};
-
-	this.getDirection = function () {
-
-		var direction = new Vector3( 0, 0, - 1 );
-
-		return function ( v ) {
-
-			return v.copy( direction ).applyQuaternion( object.quaternion );
-
-		};
-
-	}();
-
-	this.moveForward = function ( distance ) {
-
-		// move forward parallel to the xz-plane
-		// assumes camera.up is y-up
-
-		vec.setFromMatrixColumn( object.matrix, 0 );
-
-		vec.crossVectors( object.up, vec );
-
-		object.position.addScaledVector( vec, distance );
-
-	};
-
-	this.moveRight = function ( distance ) {
-
-		vec.setFromMatrixColumn( object.matrix, 0 );
-
-		object.position.addScaledVector( vec, distance );
-
-	};
-
-	this.lock = function () {
-
-		this.domElement.requestPointerLock();
-
-	};
-
-	this.unlock = function () {
-
-		scope.domElement.ownerDocument.exitPointerLock();
-
-	};
-
-	this.connect();
-
-};
-
-MovementPointerLockControls.prototype = Object.create( EventDispatcher.prototype );
-MovementPointerLockControls.prototype.constructor = MovementPointerLockControls;
 
 var CameraOrbitControls = function ( object, domElement ) {
     if ( domElement === undefined ) {
@@ -171,10 +46,6 @@ var CameraOrbitControls = function ( object, domElement ) {
 
     var euler = new Euler( 0, 0, 0, 'YXZ' );
 
-	var PI_2 = Math.PI / 2;
-
-	var vec = new Vector3();
-
 	function onMouseMove( event ) {
 
         if ( scope.isLocked === false ) return;
@@ -200,7 +71,10 @@ var CameraOrbitControls = function ( object, domElement ) {
             }
         }
         
-		euler.x = Math.max( PI_2 - scope.maxPolarAngle, Math.min( PI_2 - scope.minPolarAngle, euler.x ) );
+        // console.log(euler.x);
+        // console.log(scope.minPolarAngle);
+        // console.log(scope.maxPolarAngle);
+		euler.x = Math.min( scope.maxPolarAngle, Math.max( scope.minPolarAngle, euler.x ) );
 
 		object.quaternion.setFromEuler( euler );
 
@@ -737,4 +611,4 @@ var HeadPointerLockControls = function ( object, domElement ) {
 HeadPointerLockControls.prototype = Object.create( EventDispatcher.prototype );
 HeadPointerLockControls.prototype.constructor = HeadPointerLockControls;
 
-export { MovementPointerLockControls, CameraOrbitControls, CameraPointerLockControls, AimPointerLockControls, HeadPointerLockControls};
+export { CameraOrbitControls, CameraPointerLockControls, AimPointerLockControls, HeadPointerLockControls};
