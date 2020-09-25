@@ -43,7 +43,6 @@ var light;
 var ambient;
 
 var currentCamera;
-var currentCameraIdx = 0;
 
 var firstPersonCamera;
 var thirdPersonCamera;
@@ -143,12 +142,14 @@ models = {
                     thigh: null,
                     shin: null,
                     foot: null,
+                    heel: null,
                     toe: null,
                 },
                 right: {
                     thigh: null,
                     shin: null,
                     foot: null,
+                    heel: null,
                     toe: null,
                 },
             }   
@@ -205,13 +206,15 @@ var linkRestJoints = {
             thigh: null,
             shin: null,
             foot: null,
+            heel: null,
             toe: null,
         },
         right: {
             thigh: null,
             shin: null,
             foot: null,
-            toe: null,
+            heel: null,
+            toe: null
         },
     }   
 }
@@ -444,6 +447,11 @@ function initLinkJoints() {
                 linkRestJoints.lower.left.toe = new THREE.Euler();
                 linkRestJoints.lower.left.toe.copy(obj.rotation);
             }
+            if (obj.name === 'heel02L') {
+                link.joints.lower.left.heel = obj;
+                linkRestJoints.lower.left.heel = new THREE.Euler();
+                linkRestJoints.lower.left.heel.copy(obj.rotation);
+            }
         
             // Lower right limbs
             if (obj.name === 'thighR') {
@@ -460,6 +468,11 @@ function initLinkJoints() {
                 link.joints.lower.right.foot = obj;
                 linkRestJoints.lower.right.foot = new THREE.Euler();
                 linkRestJoints.lower.right.foot.copy(obj.rotation);
+            }
+            if (obj.name === 'heel02R') {
+                link.joints.lower.right.heel = obj;
+                linkRestJoints.lower.right.heel = new THREE.Euler();
+                linkRestJoints.lower.right.heel.copy(obj.rotation);
             }
             if (obj.name === 'toeR') {
                 link.joints.lower.right.toe = obj;
@@ -892,7 +905,6 @@ function pauseGame() {
 
 // Collisions
 function handleLinkCollision(collidedObject) {
-    console.log(collidedObject);
     const link = models.link.root;
     const linkPosition = link.position;
     const objPosition = collidedObject.position;
@@ -1377,10 +1389,18 @@ function onWindowResize() {
 function restoreLinkLowerJoints() {
     const linkJoints = models.link.joints;
 
+    // Thighs
     linkJoints.lower.left.thigh.rotation.copy(linkRestJoints.lower.left.thigh);
-    linkJoints.lower.left.shin.rotation.copy(linkRestJoints.lower.left.shin);
     linkJoints.lower.right.thigh.rotation.copy(linkRestJoints.lower.right.thigh);
+
+    // Shins
+    linkJoints.lower.left.shin.rotation.copy(linkRestJoints.lower.left.shin);
     linkJoints.lower.right.shin.rotation.copy(linkRestJoints.lower.right.shin);
+
+    // Feet
+    linkJoints.lower.left.foot.rotation.copy(linkRestJoints.lower.left.foot);
+    linkJoints.lower.right.foot.rotation.copy(linkRestJoints.lower.right.foot);
+
 }
 
 function restoreLinkUpperJoints() {
@@ -1488,65 +1508,80 @@ function startLinkLowerWalkAnimation() {
     const time1 = 200;
     const time2 = 400;
     const time3 = 200;
-    
+
     const thighLAngle = linkJoints.lower.left.thigh.rotation.x;
     const thighRAngle = linkJoints.lower.right.thigh.rotation.x;
     const shinLAngle = linkJoints.lower.left.shin.rotation.x;
     const shinRAngle = linkJoints.lower.right.shin.rotation.x;
+    const footLAngle = linkJoints.lower.left.foot.rotation.x;
+    const footRAngle = linkJoints.lower.right.foot.rotation.x;
 
     const thighLAngle1 = UTILS.degToRad(30);
     const thighRAngle1 = UTILS.degToRad(-30);
     const shinLAngle1 = 0;
     const shinRAngle1 = UTILS.degToRad(30);
+    const footLAngle1 = UTILS.degToRad(60);
+    const footRAngle1 = UTILS.degToRad(-60);
     
     const thighLAngle2 = UTILS.degToRad(-30);
     const thighRAngle2 = UTILS.degToRad(30);
     const shinLAngle2 = UTILS.degToRad(30);
     const shinRAngle2 = 0;
+    const footLAngle2 = UTILS.degToRad(-60);
+    const footRAngle2 = UTILS.degToRad(60);
     
     const thighLAngle3 = 0
     const thighRAngle3 = 0;
     const shinLAngle3 = 0;
     const shinRAngle3 = 0;
+    const footLAngle3 = 0;
+    const footRAngle3 = 0;
 
     // Tweens
-    var upper = {thighL: 0.0, thighR: 0.0, shinL: 0.0, shinR: 0.0};
-    var upperTween1 = new TWEEN.Tween(upper)
-	.to({ thighL: thighLAngle1, thighR: thighRAngle1, shinL: shinLAngle1, shinR: shinRAngle1}, time1) 
+    var lower = {thighL: 0.0, thighR: 0.0, shinL: 0.0, shinR: 0.0, footL: 0.0, footR: 0.0};
+    var upperTween1 = new TWEEN.Tween(lower)
+	.to({ thighL: thighLAngle1, thighR: thighRAngle1, shinL: shinLAngle1, shinR: shinRAngle1, footL: footLAngle1, footR: footRAngle1}, time1) 
 	.onUpdate( 
-            () => {
-                linkJoints.lower.left.thigh.rotation.x = thighLAngle + upper.thighL; 
-                linkJoints.lower.right.thigh.rotation.x = thighRAngle + upper.thighR; 
+        () => {
+            linkJoints.lower.left.thigh.rotation.x = thighLAngle + lower.thighL; 
+            linkJoints.lower.right.thigh.rotation.x = thighRAngle + lower.thighR; 
 
-                linkJoints.lower.left.shin.rotation.x = shinLAngle + upper.shinL; 
-                linkJoints.lower.right.shin.rotation.x = shinRAngle + upper.shinR;
-            }
+            linkJoints.lower.left.shin.rotation.x = shinLAngle + lower.shinL; 
+            linkJoints.lower.right.shin.rotation.x = shinRAngle + lower.shinR;
+
+            linkJoints.lower.left.foot.rotation.x = footLAngle + lower.footL;
+            linkJoints.lower.right.foot.rotation.x = footRAngle + lower.footR;
+        }
     );
         
-    var upperTween2 = new TWEEN.Tween(upper)
-	.to({ thighL: thighLAngle2, thighR: thighRAngle2, shinL: shinLAngle2, shinR: shinRAngle2}, time2) 
+    var upperTween2 = new TWEEN.Tween(lower)
+	.to({ thighL: thighLAngle2, thighR: thighRAngle2, shinL: shinLAngle2, shinR: shinRAngle2, footL: footLAngle2, footR: footRAngle2}, time2) 
 	.onUpdate( 
-            () => {
-                linkJoints.lower.left.thigh.rotation.x = thighLAngle + upper.thighL; 
-                linkJoints.lower.right.thigh.rotation.x = thighRAngle + upper.thighR; 
+        () => {
+            linkJoints.lower.left.thigh.rotation.x = thighLAngle + lower.thighL; 
+            linkJoints.lower.right.thigh.rotation.x = thighRAngle + lower.thighR; 
 
-                linkJoints.lower.left.shin.rotation.x = shinLAngle + upper.shinL; 
-                linkJoints.lower.right.shin.rotation.x = shinRAngle + upper.shinR;
-            }
+            linkJoints.lower.left.shin.rotation.x = shinLAngle + lower.shinL; 
+            linkJoints.lower.right.shin.rotation.x = shinRAngle + lower.shinR;
+
+            linkJoints.lower.left.foot.rotation.x = footLAngle + lower.footL;
+            linkJoints.lower.right.foot.rotation.x = footRAngle + lower.footR;
+        }
     );
-
-    var upperTween3 = new TWEEN.Tween(upper)
-	.to({ thighL: thighLAngle3, thighR: thighRAngle3, shinL: shinLAngle3, shinR: shinRAngle3}, time3) 
+    var upperTween3 = new TWEEN.Tween(lower)
+	.to({ thighL: thighLAngle3, thighR: thighRAngle3, shinL: shinLAngle3, shinR: shinRAngle3, footL: footLAngle3, footR: footRAngle3}, time3) 
 	.onUpdate( 
-            () => {
-                linkJoints.lower.left.thigh.rotation.x = thighLAngle + upper.thighL; 
-                linkJoints.lower.right.thigh.rotation.x = thighRAngle + upper.thighR; 
+        () => {
+            linkJoints.lower.left.thigh.rotation.x = thighLAngle + lower.thighL; 
+            linkJoints.lower.right.thigh.rotation.x = thighRAngle + lower.thighR; 
 
-                linkJoints.lower.left.shin.rotation.x = shinLAngle + upper.shinL; 
-                linkJoints.lower.right.shin.rotation.x = shinRAngle + upper.shinR;
-            }
+            linkJoints.lower.left.shin.rotation.x = shinLAngle + lower.shinL; 
+            linkJoints.lower.right.shin.rotation.x = shinRAngle + lower.shinR;
+
+            linkJoints.lower.left.foot.rotation.x = footLAngle + lower.footL;
+            linkJoints.lower.right.foot.rotation.x = footRAngle + lower.footR;
+        }
     );
-
     // Chaining
     upperTween1.chain(upperTween2);
     upperTween2.chain(upperTween3);
