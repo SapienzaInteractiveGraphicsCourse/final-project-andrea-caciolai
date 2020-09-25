@@ -1002,8 +1002,8 @@ function setFirstPersonCamera() {
     if (gameState.arrowFlying) return;
     
     currentCamera = cameras.first;
-    linkThirdCameraControls.enabled = false;
     linkFirstCameraControls.enabled = true;
+    linkThirdCameraControls.enabled = false;
     document.querySelector( '#crosshair' ).hidden = false;
 }
 
@@ -1011,13 +1011,16 @@ function setThirdPersonCamera() {
     if (gameState.gamePaused) return;
     if (gameState.arrowFlying) return;
     
+    // Restore link orientation
+    models.link.root.rotation.y = 0;
     currentCamera = cameras.third;
-    linkFirstCameraControls.enabled = false;
+    
+    // linkFirstCameraControls.enabled = false;
     linkThirdCameraControls.enabled = true;
     document.querySelector( '#crosshair' ).hidden = true;
 }
 
-function setAimCameraControls() {
+function setAimListeners() {
     var onMouseClick = function (event) {
         if (gameState.gamePaused) return;
         if (gameState.gameOver) return;
@@ -1050,6 +1053,63 @@ function setAimCameraControls() {
     document.addEventListener('mouseup', onMouseRelease, false);
 }
 
+function setShootListeners () {
+    var onMouseClick = function (event) {
+        if (gameState.gamePaused) return;
+        if (gameState.gameOver) return;
+
+        if ( event.button === 0 ){
+            // Left mouse clicked
+            
+            if (!gameState.canShoot) return;
+            if (gameState.nocking) return;
+
+            gameState.nocking = true;
+            gameState.walking = false;
+            gameState.canWalk = false;
+            
+            stopLinkWalkAnimation();
+
+            if (!gameState.aiming) {
+                // Keep camera but enable controls
+                gameState.canAim = false;
+                enableAimControls();
+                linkFirstCameraControls.enabled = true;
+                linkThirdCameraControls.enabled = false;
+            }
+            
+            gameState.nockingInitTime = performance.now();
+            startNockingArrowAnimation();
+        }
+    };
+
+    var onMouseRelease = function (event) {
+        if (gameState.gamePaused) return;
+        if (gameState.gameOver) return;
+
+        if ( event.button === 0 ) {
+            // Left mouse released
+
+            if (!gameState.nocking) return;
+
+            gameState.canShoot = false;
+            gameState.nocking = false;
+
+            if (!gameState.aiming) {
+                // Keep camera but enable controls
+                disableAimControls();
+                linkFirstCameraControls.enabled = false;
+            }
+            
+            gameState.nockingFinalTime = performance.now();
+            startArrowAnimation();
+        }
+    };
+
+    document.addEventListener('mousedown', onMouseClick, false);
+    document.addEventListener('mouseup', onMouseRelease, false);
+}
+
 function setLinkThirdCameraControls() {
     
     linkThirdCameraControls = new CameraOrbitControls( thirdPersonCameraPivot, document.body );
@@ -1066,7 +1126,9 @@ function setLinkFirstCameraControls() {
     const link = models.link.root;
     linkFirstCameraControls = new CameraPointerLockControls( link, document.body );
 
+    linkFirstCameraControls.enableMouseVertical = false;
     linkFirstCameraControls.enabled = false;    
+    
     gameControls.push(linkFirstCameraControls);
 }
 
@@ -1173,50 +1235,6 @@ function setLinkAimControls() {
     gameControls.push(aimControlsHead);
 }
 
-function setShootControls () {
-    var onMouseClick = function (event) {
-        if (gameState.gamePaused) return;
-        if (gameState.gameOver) return;
-
-        if ( event.button === 0 ){
-            // Left mouse clicked
-            
-            // if (!gameState.aiming) return;
-            if (!gameState.canShoot) return;
-            if (gameState.nocking) return;
-
-            gameState.nocking = true;
-            gameState.walking = false;
-            gameState.canWalk = false;
-            
-            stopLinkWalkAnimation();
-            
-            gameState.nockingInitTime = performance.now();
-            startNockingArrowAnimation();
-        }
-    };
-
-    var onMouseRelease = function (event) {
-        if (gameState.gamePaused) return;
-        if (gameState.gameOver) return;
-
-        if ( event.button === 0 ) {
-            // Left mouse released
-
-            if (!gameState.nocking) return;
-
-            gameState.canShoot = false;
-            gameState.nocking = false;
-            
-            gameState.nockingFinalTime = performance.now();
-            startArrowAnimation();
-        }
-    };
-
-    document.addEventListener('mousedown', onMouseClick, false);
-    document.addEventListener('mouseup', onMouseRelease, false);
-}
-
 function setListeners(controls) {
     pauseScreen.addEventListener( 'click', function () {
         
@@ -1238,8 +1256,8 @@ function setControls() {
     setLinkThirdCameraControls();
     setLinkFirstCameraControls();
     setLinkAimControls();
-    setShootControls();
-    setAimCameraControls();
+    setShootListeners();
+    setAimListeners();
 
     gameControls.forEach(
         (controls) => {
@@ -1253,12 +1271,14 @@ function setControls() {
 }
 
 function enableAimControls() {
+    linkFirstCameraControls.enabled = false;
     aimControlsArmL.enabled = true;
     aimControlsArmR.enabled = true;
     aimControlsHead.enabled = true;
 }
 
 function disableAimControls() {
+    linkFirstCameraControls.enabled = false;
     aimControlsArmL.enabled = false;
     aimControlsArmR.enabled = false;
     aimControlsHead.enabled = false;
@@ -1590,14 +1610,17 @@ function startLinkWalkAnimation() {
     if ( linkMovementTweens.length != 0 ) return;
     
     startLinkLowerWalkAnimation();
-    startLinkUpperWalkAnimation();
+
+    if (!gameState.aiming) startLinkUpperWalkAnimation();
 }
 
 function stopLinkWalkAnimation() {
     UTILS.stopTweens(linkMovementTweens);
     linkMovementTweens = [];
+    
     restoreLinkLowerJoints();
-    restoreLinkUpperJoints();
+    
+    if (!gameState.aiming) restoreLinkUpperJoints();
     
     // Attach bow string back to handR
     models.link.joints.upper.right.hand.attach(models.bow.joints.string);
@@ -1773,6 +1796,7 @@ function stopArrowFlight() {
     .onComplete(() => 
     {
         buildNewArrow();
+
         setThirdPersonCamera();
         
         gameState.canShoot = true; 
@@ -1915,7 +1939,9 @@ function render(time) {
     
         prevTime = time;    
     }
-
+    console.log(aimControlsArmL.enabled);
+    console.log(aimControlsArmR.enabled);
+    console.log(aimControlsHead.enabled);
     renderer.render(scene, currentCamera);
     requestAnimationFrame(render);
 }
