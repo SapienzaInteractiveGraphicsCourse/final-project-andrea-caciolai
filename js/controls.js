@@ -394,9 +394,6 @@ var AimPointerLockControls = function ( object, domElement ) {
             }
         }
 
-        // if (object.name === "upper_armR") {
-        //     console.log(object.rotation);            
-        // }
 		scope.dispatchEvent( changeEvent );
     }
 

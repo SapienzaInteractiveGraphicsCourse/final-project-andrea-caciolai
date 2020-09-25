@@ -487,6 +487,13 @@ function buildLink() {
 
     initLinkJoints();
 
+    // Compute bounding box
+    link.root.traverse((mesh) => {
+        if (mesh.isMesh) {
+            mesh.geometry.computeBoundingBox();
+        }
+    });
+
     console.log(UTILS.dumpObject(link.root));
 }
 
@@ -522,6 +529,14 @@ function buildTarget() {
     target.root.rotation.set(...rotation);
 
     scene.add( target.root );
+
+    // Compute bounding box
+    target.root.traverse((mesh) => {
+        if (mesh.isMesh) {
+            mesh.geometry.computeBoundingBox();
+        }
+    });
+
     console.log(UTILS.dumpObject(target.root));
 }
 
@@ -543,6 +558,13 @@ function buildArrow() {
     arrow.root.scale.multiplyScalar(arrow.scale);
     const rotation = UTILS.degToRad3(arrow.rotation);
     arrow.root.rotation.set(...rotation);
+
+    // Compute bounding box
+    arrow.root.traverse((mesh) => {
+        if (mesh.isMesh) {
+            mesh.geometry.computeBoundingBox();
+        }
+    });
 
     console.log(UTILS.dumpObject(arrow.root));
 }
@@ -930,26 +952,66 @@ function registerArrowMiss() {
     arrowsLeft -= 1;
 }
 
-function buildObjectsCollider(object, collidableObjects, handleCollisionCallback) {
+function setRaycasterCollider(object, collideableObjects, handleCollisionCallback) {
+    var raycaster = new THREE.Raycaster();
+    var origin = new THREE.Vector3();
+    var direction = new THREE.Vector3();
+    var results;
+    var closest;
 
-    var objectBox = new THREE.Box3();
-    
-    var collidableObject;
-    var collidableBox = new THREE.Box3();
+    const threshold = 1;
 
     var collider = function() {
-        objectBox.setFromObject(object);
+        origin.copy(object.position);
+        object.getWorldDirection(direction);
         
-        for (var i = 0; i < collidableObjects.length; i++) {    
-            
-            collidableObject = collidableObjects[i];
-            collidableBox.setFromObject(collidableObject);
-            
-            if ( objectBox.intersectsBox(collidableBox) ) {
-                // a collision occurred... do something...
-                handleCollisionCallback(collidableObject);
-            }
+        raycaster.set(origin, direction);
+        results = raycaster.intersectObjects(collideableObjects);
+        
+        console.log(results);
+        
+        if (results.length <= 0) return; 
+        closest = results[0];
+        
+        if ( closest.distance < threshold ) {
+            // Collision detected
+            handleCollisionCallback(closest.object);
         }
+    }
+
+    return collider;
+}
+
+function setBoxCollider(object, collidableObjects, handleCollisionCallback) {
+
+    var objBox = new THREE.Box3();
+    var collBox = new THREE.Box3();
+    var collObj;
+
+    var collider = function() {
+        var collisionDetected = false;
+
+        object.traverse((objMesh) => {
+            if (collisionDetected) return;
+            if (!objMesh.isMesh) return;
+
+            objBox.copy( objMesh.geometry.boundingBox ).applyMatrix4( objMesh.matrixWorld );
+
+            for (var i = 0; i < collidableObjects.length; i++) {    
+                collObj = collidableObjects[i];
+                collObj.traverse((collMesh) => {
+                    if (collisionDetected) return;
+                    if (!collMesh.isMesh) return;
+
+                    collBox.copy( collMesh.geometry.boundingBox ).applyMatrix4( collMesh.matrixWorld );
+
+                    if ( objBox.intersectsBox(collBox) ) {
+                        // a collision occurred... do something...
+                        handleCollisionCallback(collObj);
+                    }
+                });
+            }
+        });
     }
     
     return collider;
@@ -964,7 +1026,7 @@ function setLinkColliders() {
     // trees.forEach((tree) => {collidableObjects.push(tree)});
 
     models.link.colliders = [];
-    models.link.colliders.push(buildObjectsCollider(link, collidableObjects, handleLinkCollision));
+    models.link.colliders.push(setBoxCollider(link, collidableObjects, handleLinkCollision));
 
 }
 
@@ -979,7 +1041,9 @@ function setArrowColliders() {
     // trees.forEach((tree) => {collideableObjects.push(tree)});
 
     models.arrow.colliders = [];
-    models.arrow.colliders.push(buildObjectsCollider(arrow, collideableObjects, handleArrowCollision));
+    // models.arrow.colliders.push(setRaycasterCollider(arrow, collideableObjects, handleArrowCollision));
+    models.arrow.colliders.push(setBoxCollider(arrow, collideableObjects, handleArrowCollision));
+
 }
 
 function setColliders() {
@@ -1012,10 +1076,11 @@ function setThirdPersonCamera() {
     if (gameState.arrowFlying) return;
     
     // Restore link orientation
-    models.link.root.rotation.y = 0;
+    
+    if (!gameState.nocking) models.link.root.rotation.set(0, 0, 0);
     currentCamera = cameras.third;
     
-    // linkFirstCameraControls.enabled = false;
+    linkFirstCameraControls.enabled = false;
     linkThirdCameraControls.enabled = true;
     document.querySelector( '#crosshair' ).hidden = true;
 }
@@ -1028,10 +1093,13 @@ function setAimListeners() {
 
         if (event.button === 2) {
             // Right mouse clicked
+            
+            if (gameState.walking) stopLinkWalkAnimation();
             enableAimControls();
             gameState.aiming = true;
             gameState.canAim = false;
             setFirstPersonCamera();
+            if (gameState.walking) startLinkWalkAnimation();
         }
     };
 
@@ -1042,10 +1110,11 @@ function setAimListeners() {
 
         if ( event.button === 2 ) {
             // Right mouse released
-            disableAimControls();
             gameState.aiming = false;
             gameState.canAim = true;
             setThirdPersonCamera();
+            
+            if (!gameState.nocking) startLinkUpperWalkAnimation();
         }
     };
     
@@ -1342,7 +1411,9 @@ function animateLinkMovement(time) {
     var movSpeed = linkMovementSpeed;
     
     if (!gameState.canWalk) return;
-    if (gameState.aiming) movSpeed /= 5;
+    if (gameState.aiming) {
+        movSpeed /= 5;
+    }
 
     var dt = ( time - prevTime ) / 1000;
 
@@ -1393,11 +1464,9 @@ function animateLinkMovement(time) {
 
     // Animate
     if ( (Math.abs(linkVelocity.z) >= linkMovementThreshold) || (Math.abs(linkVelocity.x) >= linkMovementThreshold) ) {
-        if ( !gameState.walking ) {
-            // Start animation if movement
-            gameState.walking = true;
-            startLinkWalkAnimation();
-        }
+        // Start animation if movement
+        gameState.walking = true;
+        startLinkWalkAnimation();
     } else {
         // Stop animation if no movement
         gameState.walking = false;
@@ -1737,7 +1806,11 @@ function startArrowAnimation() {
             gameState.arrowFlying = true;
 
             currentCamera = arrowCamera;
+            
+            // Restore bowstring position
             handR.attach(bowString);
+            bowString.position.set(0, 0, 0);
+            
             restoreLinkUpperJoints();
         }
     );
@@ -1939,9 +2012,6 @@ function render(time) {
     
         prevTime = time;    
     }
-    console.log(aimControlsArmL.enabled);
-    console.log(aimControlsArmR.enabled);
-    console.log(aimControlsHead.enabled);
     renderer.render(scene, currentCamera);
     requestAnimationFrame(render);
 }
