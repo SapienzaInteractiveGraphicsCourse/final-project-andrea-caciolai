@@ -87,7 +87,7 @@ const lightShadowMapHeight = 2048;
 
 const lightShadowCameraWidth = terrainWidth / 2;
 const lightShadowCameraHeight = terrainWidth / 2;
-const lightShadowCameraDepth = 1024;
+const lightShadowCameraFar = 1024;
 
 // Sun
 const sunRadius = 20;
@@ -750,7 +750,7 @@ function createSun() {
     light.shadow.camera.top = lightShadowCameraHeight;
     light.shadow.camera.bottom = - lightShadowCameraHeight;
     light.shadow.camera.near = 0.1;
-    light.shadow.camera.far = lightShadowCameraDepth;
+    light.shadow.camera.far = lightShadowCameraFar;
 
     light.shadow.mapSize.width = lightShadowMapWidth;
     light.shadow.mapSize.height = lightShadowMapHeight;
@@ -784,7 +784,7 @@ function createMoon() {
     light.shadow.camera.top = lightShadowCameraHeight;
     light.shadow.camera.bottom = - lightShadowCameraHeight;
     light.shadow.camera.near = 0.1;
-    light.shadow.camera.far = lightShadowCameraDepth;
+    light.shadow.camera.far = lightShadowCameraFar;
 
     light.shadow.mapSize.width = lightShadowMapWidth;
     light.shadow.mapSize.height = lightShadowMapHeight;
