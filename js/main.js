@@ -1152,8 +1152,13 @@ function setShootListeners () {
             stopLinkWalkAnimation();
 
             if (!gameState.aiming) {
-                // Keep camera but enable controls
-                gameState.canAim = false;
+                // Rotate link towards direction of third camera
+                scene.attach(thirdPersonCameraPivot);
+                models.link.root.rotation.y = thirdPersonCameraPivot.rotation.z;
+                models.link.root.attach(thirdPersonCameraPivot);
+
+                // Keep third camera but enable controls
+                // gameState.canAim = false;
                 enableAimControls();
                 linkFirstCameraControls.enabled = true;
                 linkThirdCameraControls.enabled = false;
@@ -1865,7 +1870,8 @@ function animateArrowFlight(time) {
     arrowDirection.normalize();
     arrow.position.addScaledVector(arrowVelocity, 5*dt);
 
-    arrow.rotateX(Math.PI * Math.abs(arrowDirection.y) * 0.5 * dt);
+    var angle = 0.5 * Math.PI * arrowDirection.y;
+    arrow.rotateX(Math.abs(angle) * dt);
     
     if ( arrow.position.y < groundLevel ) {
         registerArrowMiss();
