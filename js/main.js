@@ -1126,7 +1126,7 @@ function setAimListeners() {
             gameState.canAim = true;
             setThirdPersonCamera();
             
-            if (!gameState.nocking) startLinkUpperWalkAnimation();
+            if (!gameState.nocking && gameState.walking) startLinkUpperWalkAnimation();
         }
     };
     
@@ -1440,6 +1440,8 @@ function animateLinkMovement(time) {
         movSpeed /= 5;
     }
 
+    if (gameState.nocking) return;
+
     var dt = ( time - prevTime ) / 1000;
 
     // Apply friction
@@ -1447,7 +1449,7 @@ function animateLinkMovement(time) {
     linkVelocity.z -= linkVelocity.z * floorFriction * dt;
 
     // Update velocity based on current direction
-    linkDirection.z = Number( linkMovement.backward ) - Number( linkMovement.forward );
+    linkDirection.z = Number( linkMovement.forward )- Number( linkMovement.backward );
     linkDirection.x = Number( linkMovement.left ) - Number( linkMovement.right );
     linkDirection.normalize(); // this ensures consistent movements in all directions
 
@@ -1467,7 +1469,7 @@ function animateLinkMovement(time) {
 
     // Update position with velocity
     models.link.root.position.x += linkVelocity.x * dt;
-    models.link.root.position.z -= linkVelocity.z * dt;
+    models.link.root.position.z += linkVelocity.z * dt;
     
     // Check map boundaries
     if (models.link.root.position.z >= mapLimitForward) {
@@ -1494,8 +1496,10 @@ function animateLinkMovement(time) {
         startLinkWalkAnimation();
     } else {
         // Stop animation if no movement
-        gameState.walking = false;
-        stopLinkWalkAnimation();
+        if (gameState.walking) {
+            gameState.walking = false;
+            stopLinkWalkAnimation();
+        }
     }
 
     // Reset collisions
@@ -1631,7 +1635,7 @@ function linkInitialWalkUpperJoints() {
 
 function startLinkUpperWalkAnimation() {
     linkInitialWalkUpperJoints();
-    
+
     const linkJoints = models.link.joints;
 
     const spineAngle = linkJoints.upper.spine003.rotation.y;
@@ -1717,7 +1721,7 @@ function startLinkWalkAnimation() {
 
     // Set initial position for lower limbs
     if ( linkMovementTweens.length != 0 ) return;
-    
+
     startLinkLowerWalkAnimation();
 
     if (!gameState.aiming) startLinkUpperWalkAnimation();
@@ -1729,8 +1733,8 @@ function stopLinkWalkAnimation() {
     
     restoreLinkLowerJoints();
     
-    if (!gameState.aiming) restoreLinkUpperJoints();
-    
+    if (!gameState.aiming && !gameState.nocking) restoreLinkUpperJoints();
+
     // Attach bow string back to handR
     models.link.joints.upper.right.hand.attach(models.bow.joints.string);
 }
@@ -1852,6 +1856,7 @@ function startArrowAnimation() {
             bowString.position.set(0, 0, 0);
             
             restoreLinkUpperJoints();
+            document.querySelector( '#crosshair' ).hidden = true;
         }
     );
     
@@ -1870,8 +1875,8 @@ function animateArrowFlight(time) {
     arrowDirection.normalize();
     arrow.position.addScaledVector(arrowVelocity, 5*dt);
 
-    var angle = 0.5 * Math.PI * arrowDirection.y;
-    arrow.rotateX(Math.abs(angle) * dt);
+    var angle = Math.abs(0.5 * Math.PI * arrowDirection.y);
+    arrow.rotateX(angle * dt);
     
     if ( arrow.position.y < groundLevel ) {
         registerArrowMiss();
