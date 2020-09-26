@@ -1817,6 +1817,9 @@ function startArrowAnimation() {
     const bowString = models.bow.joints.string;
     const arrow = models.arrow.root;
 
+    var arrowRotation = new THREE.Vector3();
+    arrowRotation.copy(arrow.rotation);
+
     bow.attach(bowString);
     scene.attach(arrow);
 
@@ -1832,16 +1835,31 @@ function startArrowAnimation() {
 
     arrowVelocity.copy(arrowInitialVelocity);
 
+    // Reparent arrow to a pivot object (better rotation handling)
+    var arrowPivot = new THREE.Object3D();
+    scene.add(arrowPivot);
+
+    arrowPivot.position.copy(arrow.position);
+    arrowPivot.rotation.set(0, arrow.rotation.y, arrowRotation.z);
+    arrowPivot.scale.copy(arrow.scale);
+
+    arrow.position.set(0, 0, 0);
+    arrow.rotation.set(arrowRotation.x, 0, 0);
+    arrow.scale.set(1, 1, 1);
+
+    arrowPivot.add(arrow);
+    models.arrow.root = arrowPivot;
+
     // Create tween to shoot arrow
     const arrowPosition = arrow.position.z;
     
     var delta = {dz: nockingAmount};
     var shootTween = new TWEEN.Tween(delta)
-    .to({dz: 0.0}, 0.1)
+    .to({dz: 0.0}, 10)
     .easing(TWEEN.Easing.Quadratic.Out)
     .onUpdate(
         () => {
-            arrow.position.z = arrowPosition + (nockingAmount - delta.dz);
+            arrowPivot.position.z = arrowPosition + (nockingAmount - delta.dz);
         }
     )
     .onComplete(
@@ -1868,17 +1886,19 @@ function animateArrowFlight(time) {
     var dt = ( time - prevTime ) / 1000;
     const groundLevel = 2.0;
 
-    const arrow = models.arrow.root;
+    const arrowPivot = models.arrow.root;
+    const arrow = models.arrow.root.children[0];
+
     arrowVelocity.addScaledVector(arrowAcceleration, dt);
     
     arrowDirection.copy(arrowVelocity)
     arrowDirection.normalize();
-    arrow.position.addScaledVector(arrowVelocity, 5*dt);
+    arrowPivot.position.addScaledVector(arrowVelocity, 5*dt);
 
-    var angle = Math.abs(0.5 * Math.PI * arrowDirection.y);
-    arrow.rotateX(angle * dt);
+    var angle = -0.5*Math.PI * arrowDirection.y;
+    arrow.rotation.x = angle;
     
-    if ( arrow.position.y < groundLevel ) {
+    if ( arrowPivot.position.y < groundLevel ) {
         registerArrowMiss();
         stopArrowFlight();
     }
@@ -1888,7 +1908,7 @@ function buildNewArrow() {
     const bow = models.bow;
     const arrow = models.arrow;
     
-    const arrowMesh = arrow.root.children[0].clone();
+    const arrowMesh = arrow.root.children[0].children[0].clone();
 
     arrow.root = new THREE.Object3D();
     arrow.root.name = "Arrow";
