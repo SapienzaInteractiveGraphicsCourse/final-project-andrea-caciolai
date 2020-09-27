@@ -1119,6 +1119,7 @@ function setAimListeners() {
         if (gameState.gamePaused) return;
         if (gameState.gameOver) return;
         if (!gameState.aiming) return;
+        if (gameState.arrowFlying) return;
 
         if ( event.button === 2 ) {
             // Right mouse released

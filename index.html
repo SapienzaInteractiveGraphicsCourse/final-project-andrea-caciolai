@@ -27,8 +27,8 @@
 
         <!-- INTERFACE -->
         <div id="gameMenu" class="justify-content-center vertical-center">
-            <!-- Central box -->
-            <div class="container" style="width: 400px;">
+            <!-- Container with title, difficulty, day/night, play button -->
+            <div class="container" style="width: 30%;">
                 <!-- Title -->
                 <div class="row p-3">
                     <div class="col">
@@ -84,7 +84,7 @@
 
             <!-- Controls -->
             <div class="modal fade" id="instructionsModal" role="dialog">
-                <div class="modal-dialog">
+                <div class="modal-dialog modal-lg">
                     <div class="modal-content">
                         <div class="modal-header">
                             <h4 class="modal-title">Instructions</h4>
@@ -92,28 +92,29 @@
                         </div>
                     <div class="modal-body">
                         <p>
-                            <h4>Theme</h4>
-                            Help Link master his archery skill.
+                            <h4>Objective</h4>
+                            Help Link master his archery skill, by shooting arrows at a (moving) target.<br>
                             
-                            His arrows are magical, so each time he hits the target, a new arrow respawns in his quiver. 
-                            However, each time he misses the target, the arrow does not respawn, so you have at most three chances to miss, after which it is game over!
+                            His arrows are magical, so each time he hits the target, a new arrow respawns in his quiver.<br>
                             
-                            You cannot go too close to the target, so position yourself in a good spot, aim, and shoot. 
+                            However, each time he misses the target, the arrow does not respawn, so you have at most three chances to miss, after which it is game over!<br>
+                            
+                            You cannot go too close to the target, so position yourself in a good spot, aim, and shoot.<br>
                             
                             Remember, gravity matters!
-                            <br/><br/>
+                            <br><br>
                             
                             <h4>Controls</h4>
-                            Move Link: WASD<br/>
-                            Move camera: MOUSE<br/>
-                            Aim: Mouse2<br/>
-                            Shoot: Mouse1
-                            <br/><br/>
+                            Move Link: WASD<br>
+                            Move Camera: MOUSE<br>
+                            Aim: Mouse2<br>
+                            Shoot: Mouse1<br>
+                            <br>
                             
                             <h4>Difficulty</h4>
-                            Easy: Target is still <br/>
-                            Medium: Target moves horizontally <br/>
-                            Hard: Target moves along a 8-shaped path.
+                            <b>Easy</b>: Target is still <br>
+                            <b>Medium</b>: Target moves horizontally <br>
+                            <b>Hard</b>: Target moves along a 8-shaped path.
                         </p>
                     </div>
                     <div class="modal-footer">
@@ -132,8 +133,8 @@
 			<div id="instructions" class="midGameText">
 				<span style="font-size:36px">Game paused. Click to play</span>
 				<br /><br />
-				Move: WASD<br/>
-                Aim: MOUSE<br/>
+				Move: WASD<br>
+                Aim: MOUSE<br>
                 Switch camera: Q
 			</div>
         </div>
