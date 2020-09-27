@@ -1823,7 +1823,7 @@ function startArrowAnimation() {
     bow.attach(bowString);
     scene.attach(arrow);
 
-    // Compute arrow trajectory
+    // Compute arrow trajectory (wrt to scene)
     var dir = computeArrowDirection();
 
     // Initial position
@@ -1832,23 +1832,9 @@ function startArrowAnimation() {
 
     // Initial velocity
     var arrowInitialVelocity = computeArrowInitialVelocity(dir);
-
     arrowVelocity.copy(arrowInitialVelocity);
 
-    // Reparent arrow to a pivot object (better rotation handling)
-    var arrowPivot = new THREE.Object3D();
-    scene.add(arrowPivot);
-
-    arrowPivot.position.copy(arrow.position);
-    arrowPivot.rotation.set(0, arrow.rotation.y, arrowRotation.z);
-    arrowPivot.scale.copy(arrow.scale);
-
-    arrow.position.set(0, 0, 0);
-    arrow.rotation.set(arrowRotation.x, 0, 0);
-    arrow.scale.set(1, 1, 1);
-
-    arrowPivot.add(arrow);
-    models.arrow.root = arrowPivot;
+    // Reparent arrow to bow for shoot animation
 
     // Create tween to shoot arrow
     const arrowPosition = arrow.position.z;
@@ -1859,7 +1845,7 @@ function startArrowAnimation() {
     .easing(TWEEN.Easing.Quadratic.Out)
     .onUpdate(
         () => {
-            arrowPivot.position.z = arrowPosition + (nockingAmount - delta.dz);
+            arrow.position.z = arrowPosition + (nockingAmount - delta.dz);
         }
     )
     .onComplete(
@@ -1872,7 +1858,25 @@ function startArrowAnimation() {
             // Restore bowstring position
             handR.attach(bowString);
             bowString.position.set(0, 0, 0);
+
+            // Reparent arrow to a pivot object (better rotation handling)
+            var arrowPivot = new THREE.Object3D();
+            scene.add(arrowPivot);
+
+            arrowPivot.position.copy(arrowInitialPosition);
+            arrowPivot.rotation.copy(arrow.rotation);
+            arrowPivot.rotation.x = 0;
+            arrowPivot.rotation.z = 0;
+            arrowPivot.scale.copy(arrow.scale);
+
+            arrow.position.set(0, 0, 0);
+            arrow.rotation.set(arrowRotation.x, 0, 0);
+            arrow.scale.set(1, 1, 1);
+
+            arrowPivot.add(arrow);
+            models.arrow.root = arrowPivot;
             
+            // Reposition Link's arms and hide crosshair
             restoreLinkUpperJoints();
             document.querySelector( '#crosshair' ).hidden = true;
         }
