@@ -115,7 +115,7 @@ var loadModelsList;
 
 models = {
     link:    { 
-        url: '../assets/models/link_with_bow/link_with_bow.gltf',
+        url: 'assets/models/link_with_bow/link_with_bow.gltf',
         position: [ 0, 0, 0 ],
         rotation: [ 0, 0, 0, ],
         scale: 10,
@@ -161,20 +161,20 @@ models = {
         }
     },
     target:  { 
-        url: '../assets/models/new_target/new_target.gltf',
+        url: 'assets/models/new_target/new_target.gltf',
         position: [ 0, 0, 100 ],
         rotation: [ 0, 180, 0, ],
         scale: 10,
         buildCallback: buildTarget,
     },
     arrow: {
-        url: '../assets/models/arrow/arrow.gltf',
+        url: 'assets/models/arrow/arrow.gltf',
         rotation: [0, 0, 0],
         scale: 22,
         buildCallback: buildArrow,
     },
     tree: {
-        url: '../assets/models/new_tree/new_tree.gltf',
+        url: 'assets/models/new_tree/new_tree.gltf',
         rotation: [0, 0, 0],
         scale: 3,
         buildCallback: buildTrees,
