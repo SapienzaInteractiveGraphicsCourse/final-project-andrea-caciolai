@@ -4,7 +4,7 @@ import {
     Spherical,
     Quaternion,
 	Vector3
-} from "../lib/three.js/build/three.module.js";
+} from "../lib/three/build/three.module.js";
 
 import * as UTILS from "./utils.js";
 

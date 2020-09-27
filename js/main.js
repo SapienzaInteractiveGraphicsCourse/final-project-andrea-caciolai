@@ -1380,8 +1380,13 @@ function lockControls() {
 
 // Renderer callbacks
 function onWindowResize() {
-    thirdPersonCamera.aspect = window.innerWidth / window.innerHeight;
-    thirdPersonCamera.updateProjectionMatrix();
+    var camera;
+    Object.keys(cameras).forEach(function(key) {
+        camera = cameras[key];
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+    });
+    
     renderer.setSize( window.innerWidth, window.innerHeight );
 }
  

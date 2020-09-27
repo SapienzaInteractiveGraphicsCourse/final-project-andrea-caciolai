@@ -1,4 +1,4 @@
-import * as THREE from '../lib/three.js/build/three.module.js'
+import * as THREE from '../lib/three/build/three.module.js'
 
 // ============================================================================
 // UTILITY FUNCTIONS
