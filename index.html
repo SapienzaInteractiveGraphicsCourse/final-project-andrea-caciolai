@@ -21,8 +21,12 @@
 	</head>
 	<body class="text-center">
         <!-- Image assets -->
-        <div id="crosshair" hidden>
-            <img id="crosshair-img" src="assets/images/crosshair.webp">
+        <div id="crosshair" class="crosshair" hidden>
+            <img id="crosshair-img" class="crosshair-img" src="assets/images/crosshair.png">
+        </div>
+
+        <div id="crosshair-white" class="crosshair" hidden>
+            <img id="crosshair-white-img" class="crosshair-img" src="assets/images/crosshair-white.png">
         </div>
 
         <!-- INTERFACE -->
@@ -133,9 +137,9 @@
         </div>
         <div id="pauseScreen" class="midGameScreen" hidden>
 			<div id="instructions" class="midGameText">
-				<span style="font-size:36px">Game paused. Click to play.</span>
+				<span style="font-size:36px">Game paused. Click to resume playing.</span>
                 <br><br>
-                <span style="font-size:30px">Controls:</span>
+                <span style="font-size:30px">Controls:</span><br>
 				Move Link: WASD<br>
                 Move camera: Mouse<br>
                 Aim: Press Mouse2<br>

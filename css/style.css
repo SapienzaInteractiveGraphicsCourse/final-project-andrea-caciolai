@@ -136,7 +136,7 @@ html, body {
     cursor: pointer;
 }
 
-#crosshair {
+.crosshair {
     margin: 0;
     position: absolute;
     top: 55%;
@@ -145,7 +145,7 @@ html, body {
     transform: translate(-55%, -60%);
 }
 
-#crosshair-img {
+.crosshair-img {
     height: auto; 
     width: auto; 
     max-width: 100px; 

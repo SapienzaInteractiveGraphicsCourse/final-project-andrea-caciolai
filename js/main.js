@@ -36,6 +36,7 @@ var gameState = {
 
 var difficulty;
 var daylight;
+var crosshair;
 
 // Objects variables
 var scene;
@@ -311,8 +312,7 @@ function initLoadingScreen() {
 
 
     // Hide crosshair
-    document.querySelector( '#crosshair' ).hidden = true;
-
+    crosshair.hidden = true;
 
     gameState.guiInitialized = true;
 }
@@ -322,6 +322,11 @@ function setOptions() {
     daylight = $('input[name=daylightRadio]:checked', '#daylightForm').val()
 
     gameState.optionsSet = true;
+    if ( daylight === 'day' ) {
+        crosshair = document.querySelector( '#crosshair' );
+    } else {
+        crosshair = document.querySelector( '#crosshair-white' );
+    }
 }
 
 // ============================================================================
@@ -1080,7 +1085,7 @@ function setFirstPersonCamera() {
     currentCamera = cameras.first;
     linkFirstCameraControls.enabled = true;
     linkThirdCameraControls.enabled = false;
-    document.querySelector( '#crosshair' ).hidden = false;
+    crosshair.hidden = false;
 }
 
 function setThirdPersonCamera() {
@@ -1094,7 +1099,7 @@ function setThirdPersonCamera() {
     
     linkFirstCameraControls.enabled = false;
     linkThirdCameraControls.enabled = true;
-    document.querySelector( '#crosshair' ).hidden = true;
+    crosshair.hidden = true;
 }
 
 function setAimListeners() {
@@ -1884,7 +1889,7 @@ function startArrowAnimation() {
             
             // Reposition Link's arms and hide crosshair
             restoreLinkUpperJoints();
-            document.querySelector( '#crosshair' ).hidden = true;
+            crosshair.hidden = true;
         }
     );
     
