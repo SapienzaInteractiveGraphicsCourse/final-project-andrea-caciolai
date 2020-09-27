@@ -825,7 +825,7 @@ function randomHeightTerrain(terrainGeometry) {
 }
 
 function buildTerrain() {
-    var terrainTexture = textureLoader.load( '../assets/textures/grass_texture.png' );
+    var terrainTexture = textureLoader.load( 'assets/textures/grass_texture.png' );
     terrainTexture.wrapS = terrainTexture.wrapT = THREE.RepeatWrapping;
     terrainTexture.repeat.set( terrainTextureRepeat, terrainTextureRepeat );
     terrainTexture.anisotropy = terrainTextureAnisotropy;
