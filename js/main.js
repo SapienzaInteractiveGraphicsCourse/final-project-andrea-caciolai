@@ -1,10 +1,10 @@
-import * as THREE from '../lib/three.js/build/three.module.js'
-import {GLTFLoader} from '../lib/three.js/examples/jsm/loaders/GLTFLoader.js'
+import * as THREE from '../lib/three/build/three.module.js'
+import {GLTFLoader} from '../lib/three/examples/jsm/loaders/GLTFLoader.js'
 
 import { CameraOrbitControls, CameraPointerLockControls, AimPointerLockControls, HeadPointerLockControls } from './controls.js';
-import TWEEN from '../lib/tween.js/dist/tween.esm.js'
+import TWEEN from '../lib/tween/dist/tween.esm.js'
 
-import {SkeletonUtils} from '../lib/three.js/examples/jsm/utils/SkeletonUtils.js';
+import {SkeletonUtils} from '../lib/three/examples/jsm/utils/SkeletonUtils.js';
 import * as UTILS from './utils.js'
 
 // ============================================================================
